@@ -1,10 +1,30 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from './components/Button';
 import { Section } from './components/Section';
 import { HeroIllustration, SolutionIllustration, BlobBackground } from './components/AnimatedIllustration';
 import { Receipt, Users, Calculator, Share2, MessageSquare, AlertCircle, ArrowRight } from 'lucide-react';
+import { CreateRoom } from './components/CreateRoom';
+import { RoomDetail } from './components/RoomDetail';
 
 export default function App() {
+  // State untuk mengatur halaman mana yang tampil
+  const [view, setView] = useState<'landing' | 'create-room' | 'room-detail'>('landing');
+
+  // Logika Perpindahan Halaman
+  if (view === 'room-detail') {
+    return <RoomDetail onBack={() => setView('create-room')} />;
+  }
+
+  if (view === 'create-room') {
+    return (
+      <CreateRoom 
+        onBack={() => setView('landing')} 
+        onCreate={() => setView('room-detail')} 
+      />
+    );
+  }
+
+  // Jika state 'view' adalah 'landing', render landing page seperti biasa
   return (
     <div className="min-h-screen bg-white font-sans text-slate-900 overflow-x-hidden">
       {/* Navbar */}
@@ -37,7 +57,11 @@ export default function App() {
             Bagi tagihan bareng teman, transparan & cepat. Gak perlu lagi pusing hitung manual atau nagih satu-satu.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
-            <Button className="flex items-center justify-center gap-2">
+            {/* TOMBOL CREATE ROOM DI HERO SECTION */}
+            <Button 
+              onClick={() => setView('create-room')} 
+              className="flex items-center justify-center gap-2"
+            >
               Create Room <ArrowRight className="w-5 h-5" />
             </Button>
             <Button variant="outline">Try Demo</Button>
@@ -98,7 +122,6 @@ export default function App() {
             <p className="text-indigo-100">Hanya butuh 4 langkah mudah untuk mulai.</p>
           </div>
           <div className="flex flex-col md:flex-row justify-between items-start gap-8 relative">
-            {/* Connecting Line (Desktop) */}
             <div className="hidden md:block absolute top-10 left-0 w-full h-0.5 bg-indigo-400/30 -z-0"></div>
             
             {[
@@ -109,7 +132,7 @@ export default function App() {
             ].map((item, i) => (
               <div key={i} className="flex-1 flex flex-col items-center text-center relative z-10">
                 <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mb-6 text-primary shadow-xl transform hover:rotate-6 transition-transform">
-                  {React.cloneElement(item.icon as React.ReactElement<{ className: string }>, { className: "w-10 h-10" })}
+                  {React.cloneElement(item.icon as React.ReactElement<{ className?: string }>, { className: "w-10 h-10" })}
                 </div>
                 <div className="bg-accent text-white w-8 h-8 rounded-full flex items-center justify-center font-bold mb-4 border-4 border-primary">
                   {item.step}
@@ -120,7 +143,6 @@ export default function App() {
             ))}
           </div>
         </div>
-        {/* Decorative Circles */}
         <div className="absolute -top-24 -right-24 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
         <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-accent/20 rounded-full blur-3xl"></div>
       </Section>
@@ -133,7 +155,11 @@ export default function App() {
           <p className="text-slate-600 mb-10 text-lg">
             Bergabunglah dengan ribuan pengguna yang sudah meninggalkan cara lama yang ribet.
           </p>
-          <Button className="text-xl py-6 px-12 shadow-2xl">
+          {/* TOMBOL CREATE ROOM DI BAWAH */}
+          <Button 
+            onClick={() => setView('create-room')} 
+            className="text-xl py-6 px-12 shadow-2xl"
+          >
             Create Room Now
           </Button>
         </div>
