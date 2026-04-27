@@ -109,7 +109,7 @@ export default function App() {
             ].map((item, i) => (
               <div key={i} className="flex-1 flex flex-col items-center text-center relative z-10">
                 <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mb-6 text-primary shadow-xl transform hover:rotate-6 transition-transform">
-                  {React.cloneElement(item.icon as React.ReactElement, { className: "w-10 h-10" })}
+                  {React.cloneElement(item.icon as React.ReactElement<{ className: string }>, { className: "w-10 h-10" })}
                 </div>
                 <div className="bg-accent text-white w-8 h-8 rounded-full flex items-center justify-center font-bold mb-4 border-4 border-primary">
                   {item.step}
