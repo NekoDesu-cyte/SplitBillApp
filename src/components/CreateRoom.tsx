@@ -35,7 +35,7 @@ export const CreateRoom: React.FC<{
     <div className="min-h-screen bg-slate-50 pb-20">
       {/* Header */}
       <div className="bg-white border-b border-slate-200 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-6 py-4 flex items-center gap-4">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center gap-4">
           <button
             onClick={onBack}
             className="p-2 hover:bg-slate-100 rounded-full transition-colors"
@@ -122,27 +122,6 @@ export const CreateRoom: React.FC<{
                   </span>
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* Split Method */}
-          <div className="space-y-4">
-            <label className="block text-sm font-semibold text-slate-700">
-              Split Method
-            </label>
-            <div className="flex p-1 bg-slate-100 rounded-2xl">
-              <button
-                onClick={() => setSplitMethod("equal")}
-                className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${splitMethod === "equal" ? "bg-white shadow-sm text-primary" : "text-slate-500 hover:text-slate-700"}`}
-              >
-                Equal Split
-              </button>
-              <button
-                onClick={() => setSplitMethod("custom")}
-                className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${splitMethod === "custom" ? "bg-white shadow-sm text-primary" : "text-slate-500 hover:text-slate-700"}`}
-              >
-                Custom (OCR)
-              </button>
             </div>
           </div>
 
