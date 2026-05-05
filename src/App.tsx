@@ -5,10 +5,11 @@ import { HeroIllustration, SolutionIllustration, BlobBackground } from './compon
 import { Receipt, Users, Calculator, Share2, MessageSquare, AlertCircle, ArrowRight } from 'lucide-react';
 import { CreateRoom } from './components/CreateRoom';
 import { RoomDetail } from './components/RoomDetail';
+import { Auth } from './components/Auth'; // <-- TAMBAHAN 1: Import Auth
 
 export default function App() {
-  // State untuk mengatur halaman mana yang tampil
-  const [view, setView] = useState<'landing' | 'create-room' | 'room-detail'>('landing');
+  // TAMBAHAN 2: Tambahkan 'auth' pada tipe state view
+  const [view, setView] = useState<'landing' | 'create-room' | 'room-detail' | 'auth'>('landing');
 
   // Logika Perpindahan Halaman
   if (view === 'room-detail') {
@@ -22,6 +23,11 @@ export default function App() {
         onCreate={() => setView('room-detail')} 
       />
     );
+  }
+
+  // TAMBAHAN 3: Render halaman Auth jika state view adalah 'auth'
+  if (view === 'auth') {
+    return <Auth onBack={() => setView('landing')} />;
   }
 
   // Jika state 'view' adalah 'landing', render landing page seperti biasa
@@ -41,7 +47,8 @@ export default function App() {
             <a href="#solution" className="hover:text-primary transition-colors">Features</a>
             <a href="#how-it-works" className="hover:text-primary transition-colors">How it Works</a>
           </div>
-          <Button variant="outline" className="hidden md:block py-2 px-6 text-sm">
+          {/* TAMBAHAN 4: Tambahkan onClick untuk pindah ke halaman auth */}
+          <Button onClick={() => setView('auth')} variant="outline" className="hidden md:block py-2 px-6 text-sm">
             Login
           </Button>
         </div>

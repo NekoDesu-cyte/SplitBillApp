@@ -152,9 +152,6 @@ export const CreateRoom: React.FC<{
                 <ReceiptText className="w-5 h-5 text-accent" />
                 <h3 className="font-bold text-slate-800">Extracted Items</h3>
               </div>
-              <button className="text-sm font-bold text-primary flex items-center gap-1 hover:underline">
-                <Plus className="w-4 h-4" /> Add
-              </button>
             </div>
 
             <div className="space-y-2">
