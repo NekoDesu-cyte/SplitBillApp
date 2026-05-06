@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ArrowRight, Receipt, Plus, Wand2 } from "lucide-react";
+import { ArrowRight, Receipt, Plus, Wand2, ArrowLeft } from "lucide-react";
 
 interface Item {
   id: number;
@@ -34,8 +34,17 @@ export const CreateRoom: React.FC<{
   return (
     <div className="min-h-screen bg-[#f8f9fa] pb-20 font-sans text-slate-800">
       {/* Header Minimalis */}
-      <div className="bg-white border-b border-slate-200 sticky top-0 z-10 py-5">
-        <div className="max-w-7xl mx-auto flex items-center justify-center relative">
+      <div className="bg-white border-b border-slate-200 sticky top-0 z-10 py-4">
+        <div className="max-w-7xl mx-auto flex items-center justify-center relative px-6">
+
+          {/* INI Button KEMBALi */}
+          <button
+            onClick={onBack}
+            className="absolute left-4 md:left-6 p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-600"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+
           <span className="font-display font-extrabold text-xl tracking-tight text-[#4f46e5]">
             SplitBill
           </span>
