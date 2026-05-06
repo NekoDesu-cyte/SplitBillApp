@@ -189,14 +189,6 @@ export const RoomDetail: React.FC<{
               <h2 className="text-xl font-bold text-slate-900">
                 Pilih Pesanan Anda
               </h2>
-              <div className="flex bg-slate-100 rounded-lg p-1">
-                <button className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 transition-colors">
-                  <LayoutGrid className="w-4 h-4" />
-                </button>
-                <button className="p-1.5 rounded-md bg-[#5b51d8] text-white shadow-sm transition-colors">
-                  <List className="w-4 h-4" />
-                </button>
-              </div>
             </div>
 
             <div className="space-y-4">
