@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Payment } from './components/Payment';
 import { Button } from './components/Button';
 import { Section } from './components/Section';
 import { HeroIllustration, SolutionIllustration, BlobBackground } from './components/AnimatedIllustration';
@@ -9,11 +10,21 @@ import { Auth } from './components/Auth'; // <-- TAMBAHAN 1: Import Auth
 
 export default function App() {
   // TAMBAHAN 2: Tambahkan 'auth' pada tipe state view
-  const [view, setView] = useState<'landing' | 'create-room' | 'room-detail' | 'auth'>('landing');
+  const [view, setView] = useState<'landing' | 'create-room' | 'room-detail' | 'auth' | 'payment'>('landing');
 
   // Logika Perpindahan Halaman
-  if (view === 'room-detail') {
-    return <RoomDetail onBack={() => setView('create-room')} />;
+ if (view === 'room-detail') {
+    return (
+      <RoomDetail 
+        onBack={() => setView('create-room')} 
+        onPay={() => setView('payment')} 
+      />
+    );
+  }
+
+  // Tambahkan blok if ini untuk memunculkan halaman payment
+  if (view === 'payment') {
+    return <Payment onBack={() => setView('room-detail')} />;
   }
 
   if (view === 'create-room') {

@@ -1,50 +1,74 @@
-import React, { useState } from 'react';
-import { 
-  Bell, 
-  Settings, 
-  Copy, 
-  X, 
-  LayoutGrid, 
-  List, 
-  Minus, 
-  Plus, 
-  ShoppingBag, 
-  Lock 
-} from 'lucide-react';
+import React, { useState } from "react";
+import {
+  Bell,
+  Settings,
+  Copy,
+  X,
+  LayoutGrid,
+  List,
+  Minus,
+  Plus,
+  ShoppingBag,
+  Lock,
+} from "lucide-react";
 
-export const RoomDetail: React.FC<{ onBack: () => void }> = ({ onBack }) => {
+export const RoomDetail: React.FC<{
+  onBack: () => void;
+  onPay: () => void;
+}> = ({ onBack, onPay }) => {
   // Dummy data untuk partisipan
   const participants = [
-    { id: 1, name: "Alex", role: "OWNER", status: "Online", avatar: "https://i.pravatar.cc/150?u=alex" },
-    { id: 2, name: "Jordan", role: "JOINED", status: "Online", avatar: "https://i.pravatar.cc/150?u=jordan" },
-    { id: 3, name: "Sarah", role: "JOINED", status: "Online", avatar: "https://i.pravatar.cc/150?u=sarah" },
+    {
+      id: 1,
+      name: "Alex",
+      role: "OWNER",
+      status: "Online",
+      avatar: "https://i.pravatar.cc/150?u=alex",
+    },
+    {
+      id: 2,
+      name: "Jordan",
+      role: "JOINED",
+      status: "Online",
+      avatar: "https://i.pravatar.cc/150?u=jordan",
+    },
+    {
+      id: 3,
+      name: "Sarah",
+      role: "JOINED",
+      status: "Online",
+      avatar: "https://i.pravatar.cc/150?u=sarah",
+    },
   ];
 
   // Dummy data untuk menu pesanan
   const menuItems = [
-    { 
-      id: 1, 
-      name: "Nasi Goreng Seafood", 
-      price: 45000, 
+    {
+      id: 1,
+      name: "Nasi Goreng Seafood",
+      price: 45000,
       img: "https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?auto=format&fit=crop&w=200&q=80",
-      claimedBy: ["https://i.pravatar.cc/150?u=jordan", "https://i.pravatar.cc/150?u=sarah"],
-      qty: 1
+      claimedBy: [
+        "https://i.pravatar.cc/150?u=jordan",
+        "https://i.pravatar.cc/150?u=sarah",
+      ],
+      qty: 1,
     },
-    { 
-      id: 2, 
-      name: "Sate Ayam (10 Tusuk)", 
-      price: 35000, 
+    {
+      id: 2,
+      name: "Sate Ayam (10 Tusuk)",
+      price: 35000,
       img: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=200&q=80",
       claimedBy: [],
-      qty: 0
+      qty: 0,
     },
-    { 
-      id: 3, 
-      name: "Es Teh Manis", 
-      price: 12000, 
+    {
+      id: 3,
+      name: "Es Teh Manis",
+      price: 12000,
       img: "https://images.unsplash.com/photo-1556679343-c7306c1976bc?auto=format&fit=crop&w=200&q=80",
       claimedBy: ["https://i.pravatar.cc/150?u=alex"],
-      qty: 2
+      qty: 2,
     },
   ];
 
@@ -60,33 +84,52 @@ export const RoomDetail: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             </span>
           </div>
           <div className="flex items-center gap-5 text-slate-500">
-            <button className="hover:text-slate-800 transition-colors"><Bell className="w-5 h-5" /></button>
+            <button className="hover:text-slate-800 transition-colors">
+              <Bell className="w-5 h-5" />
+            </button>
             <div className="w-8 h-8 rounded-full overflow-hidden border border-slate-200 ml-2">
-              <img src="https://i.pravatar.cc/150?u=alex" alt="User" className="w-full h-full object-cover" />
+              <img
+                src="https://i.pravatar.cc/150?u=alex"
+                alt="User"
+                className="w-full h-full object-cover"
+              />
             </div>
           </div>
         </div>
       </nav>
 
       <div className="max-w-6xl mx-auto px-4 md:px-6 py-8">
-        
         {/* Header Title */}
         <div className="mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-1">Room Detail - Liburan di Pantai</h1>
-          <p className="text-sm text-slate-500">Kelola tagihan bersama teman-temanmu dengan transparan.</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-1">
+            Room Detail - Liburan di Pantai
+          </h1>
+          <p className="text-sm text-slate-500">
+            Kelola tagihan bersama teman-temanmu dengan transparan.
+          </p>
         </div>
 
         {/* Banner Undang Teman */}
         <div className="bg-[#5b51d8] rounded-2xl p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8 shadow-sm">
           <div className="text-white">
-            <span className="text-xs font-semibold tracking-wider text-indigo-200 block mb-2">UNDANG TEMAN</span>
-            <h2 className="text-xl md:text-2xl font-bold mb-1">Ajak teman untuk bergabung!</h2>
-            <p className="text-sm text-indigo-100 opacity-90">Bagikan kode unik ruangan ini untuk mulai membagi tagihan.</p>
+            <span className="text-xs font-semibold tracking-wider text-indigo-200 block mb-2">
+              UNDANG TEMAN
+            </span>
+            <h2 className="text-xl md:text-2xl font-bold mb-1">
+              Ajak teman untuk bergabung!
+            </h2>
+            <p className="text-sm text-indigo-100 opacity-90">
+              Bagikan kode unik ruangan ini untuk mulai membagi tagihan.
+            </p>
           </div>
           <div className="bg-white/10 border border-white/20 rounded-xl p-4 flex items-center gap-6 backdrop-blur-sm shrink-0 w-full md:w-auto justify-between">
             <div>
-              <span className="text-[10px] font-medium text-indigo-200 block mb-0.5">ROOM CODE</span>
-              <span className="text-2xl font-extrabold text-white tracking-widest">8824</span>
+              <span className="text-[10px] font-medium text-indigo-200 block mb-0.5">
+                ROOM CODE
+              </span>
+              <span className="text-2xl font-extrabold text-white tracking-widest">
+                8824
+              </span>
             </div>
             <button className="bg-white text-[#5b51d8] hover:bg-slate-50 px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors">
               <Copy className="w-4 h-4" /> Copy Link
@@ -96,24 +139,36 @@ export const RoomDetail: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
         {/* Partisipan Card */}
         <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-8 shadow-sm">
-          <span className="text-[11px] font-bold text-slate-400 tracking-wider block mb-4">PARTISIPAN</span>
+          <span className="text-[11px] font-bold text-slate-400 tracking-wider block mb-4">
+            PARTISIPAN
+          </span>
           <div className="space-y-4 mb-6">
             {participants.map((p) => (
               <div key={p.id} className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="relative">
-                    <img src={p.avatar} alt={p.name} className="w-10 h-10 rounded-full border border-slate-200 object-cover" />
+                    <img
+                      src={p.avatar}
+                      alt={p.name}
+                      className="w-10 h-10 rounded-full border border-slate-200 object-cover"
+                    />
                     <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full"></div>
                   </div>
                   <div>
-                    <div className="text-sm font-bold text-slate-800">{p.name}</div>
-                    <div className={`text-[10px] font-bold mt-0.5 ${p.role === 'OWNER' ? 'text-[#4f46e5]' : 'text-slate-400'}`}>
+                    <div className="text-sm font-bold text-slate-800">
+                      {p.name}
+                    </div>
+                    <div
+                      className={`text-[10px] font-bold mt-0.5 ${p.role === "OWNER" ? "text-[#4f46e5]" : "text-slate-400"}`}
+                    >
                       {p.role}
                     </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-6">
-                  <span className="text-[11px] font-semibold text-green-500">{p.status}</span>
+                  <span className="text-[11px] font-semibold text-green-500">
+                    {p.status}
+                  </span>
                   <button className="text-red-500 hover:bg-red-50 p-1 rounded transition-colors">
                     <X className="w-4 h-4 stroke-[3]" />
                   </button>
@@ -128,11 +183,12 @@ export const RoomDetail: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
         {/* Grid Layout untuk Menu dan Pesanan Saya */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
           {/* Kiri: Daftar Menu */}
           <div className="lg:col-span-2">
             <div className="flex justify-between items-center mb-5">
-              <h2 className="text-xl font-bold text-slate-900">Pilih Pesanan Anda</h2>
+              <h2 className="text-xl font-bold text-slate-900">
+                Pilih Pesanan Anda
+              </h2>
               <div className="flex bg-slate-100 rounded-lg p-1">
                 <button className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 transition-colors">
                   <LayoutGrid className="w-4 h-4" />
@@ -145,23 +201,43 @@ export const RoomDetail: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
             <div className="space-y-4">
               {menuItems.map((item) => (
-                <div key={item.id} className="bg-white rounded-2xl border border-slate-200 p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4 hover:shadow-sm transition-shadow">
-                  <img src={item.img} alt={item.name} className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl object-cover shrink-0 border border-slate-100" />
-                  
+                <div
+                  key={item.id}
+                  className="bg-white rounded-2xl border border-slate-200 p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4 hover:shadow-sm transition-shadow"
+                >
+                  <img
+                    src={item.img}
+                    alt={item.name}
+                    className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl object-cover shrink-0 border border-slate-100"
+                  />
+
                   <div className="flex-1">
-                    <h3 className="font-bold text-slate-800 text-base">{item.name}</h3>
-                    <div className="text-[#4f46e5] font-semibold text-sm mt-1 mb-3">Rp {item.price.toLocaleString('id-ID')}</div>
-                    
+                    <h3 className="font-bold text-slate-800 text-base">
+                      {item.name}
+                    </h3>
+                    <div className="text-[#4f46e5] font-semibold text-sm mt-1 mb-3">
+                      Rp {item.price.toLocaleString("id-ID")}
+                    </div>
+
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-slate-500">Diklaim oleh:</span>
+                      <span className="text-[11px] text-slate-500">
+                        Diklaim oleh:
+                      </span>
                       {item.claimedBy.length > 0 ? (
                         <div className="flex -space-x-2">
                           {item.claimedBy.map((avatar, idx) => (
-                            <img key={idx} src={avatar} alt="Avatar" className="w-5 h-5 rounded-full border border-white" />
+                            <img
+                              key={idx}
+                              src={avatar}
+                              alt="Avatar"
+                              className="w-5 h-5 rounded-full border border-white"
+                            />
                           ))}
                         </div>
                       ) : (
-                        <span className="text-[11px] text-slate-400 italic">Belum ada yang memilih item ini</span>
+                        <span className="text-[11px] text-slate-400 italic">
+                          Belum ada yang memilih item ini
+                        </span>
                       )}
                     </div>
                   </div>
@@ -172,7 +248,9 @@ export const RoomDetail: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                         <button className="w-7 h-7 bg-white rounded-full flex items-center justify-center shadow-sm text-slate-600 hover:text-[#4f46e5] border border-slate-200">
                           <Minus className="w-3 h-3" />
                         </button>
-                        <span className="text-sm font-bold text-slate-800 w-4 text-center">{item.qty}</span>
+                        <span className="text-sm font-bold text-slate-800 w-4 text-center">
+                          {item.qty}
+                        </span>
                         <button className="w-7 h-7 bg-[#5b51d8] rounded-full flex items-center justify-center shadow-sm text-white hover:bg-indigo-700">
                           <Plus className="w-3 h-3" />
                         </button>
@@ -195,24 +273,38 @@ export const RoomDetail: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center text-[#4f46e5]">
                   <ShoppingBag className="w-4 h-4" />
                 </div>
-                <h3 className="font-bold text-slate-900 text-lg">Pesanan Saya</h3>
+                <h3 className="font-bold text-slate-900 text-lg">
+                  Pesanan Saya
+                </h3>
               </div>
 
               {/* Rincian Pesanan */}
               <div className="space-y-4 mb-6">
                 <div className="flex justify-between items-start">
                   <div>
-                    <div className="text-[13px] font-bold text-slate-800">Nasi Goreng Seafood</div>
-                    <div className="text-[11px] text-slate-400 mt-0.5">1x Rp 45.000</div>
+                    <div className="text-[13px] font-bold text-slate-800">
+                      Nasi Goreng Seafood
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">
+                      1x Rp 45.000
+                    </div>
                   </div>
-                  <div className="text-[13px] font-bold text-slate-800">Rp 45.000</div>
+                  <div className="text-[13px] font-bold text-slate-800">
+                    Rp 45.000
+                  </div>
                 </div>
                 <div className="flex justify-between items-start">
                   <div>
-                    <div className="text-[13px] font-bold text-slate-800">Es Teh Manis</div>
-                    <div className="text-[11px] text-slate-400 mt-0.5">2x Rp 12.000</div>
+                    <div className="text-[13px] font-bold text-slate-800">
+                      Es Teh Manis
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">
+                      2x Rp 12.000
+                    </div>
                   </div>
-                  <div className="text-[13px] font-bold text-slate-800">Rp 24.000</div>
+                  <div className="text-[13px] font-bold text-slate-800">
+                    Rp 24.000
+                  </div>
                 </div>
               </div>
 
@@ -237,10 +329,15 @@ export const RoomDetail: React.FC<{ onBack: () => void }> = ({ onBack }) => {
               {/* Total */}
               <div className="flex justify-between items-center mb-8">
                 <span className="font-bold text-slate-900">Total</span>
-                <span className="text-xl font-bold text-[#4f46e5]">Rp 79.350</span>
+                <span className="text-xl font-bold text-[#4f46e5]">
+                  Rp 79.350
+                </span>
               </div>
 
-              <button className="w-full bg-[#5b51d8] hover:bg-indigo-700 text-white font-semibold py-3.5 rounded-xl transition-colors mb-4 text-sm">
+              <button
+                onClick={onPay}
+                className="w-full bg-[#5b51d8] hover:bg-indigo-700 text-white font-semibold py-3.5 rounded-xl transition-colors mb-4 text-sm"
+              >
                 Konfirmasi & Bayar
               </button>
 
@@ -250,7 +347,6 @@ export const RoomDetail: React.FC<{ onBack: () => void }> = ({ onBack }) => {
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </div>
