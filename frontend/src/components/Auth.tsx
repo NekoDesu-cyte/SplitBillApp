@@ -7,7 +7,8 @@ import {
   Eye,
   User,
   ArrowRight,
-  ArrowLeft, // Tambahan icon untuk back
+  ArrowLeft,
+  AlertCircle,
 } from "lucide-react";
 
 interface AuthProps {
@@ -24,9 +25,23 @@ export const Auth: React.FC<AuthProps> = ({ onBack }) => {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
+  // ... di dalam komponen Auth
+  const [error, setError] = useState<string | null>(null); // State error
+  const [success, setSuccess] = useState<string | null>(null); // State sukses
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    // --- VALIDASI FRONTEND ---
+    if (password.length < 8) {
+      setError("Password minimal harus 8 karakter, ya!");
+      setIsLoading(false);
+      return;
+    }
+
     const endpoint = activeTab === "login" ? "login" : "register";
 
     try {
@@ -39,20 +54,30 @@ export const Auth: React.FC<AuthProps> = ({ onBack }) => {
           password,
         }),
       });
+
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data.error || "Terjadi kesalahan");
+      if (!res.ok) {
+        // Jika backend mengirim error "Email already exists" atau sejenisnya
+        // Pesan ini akan otomatis ditangkap dan ditampilkan di UI
+        throw new Error(data.error || "Terjadi kesalahan");
+      }
 
       if (data.token) {
         localStorage.setItem("token", data.token);
         localStorage.setItem("user", JSON.stringify(data.user));
         onBack();
       } else {
-        alert("Berhasil Daftar! Silakan Login.");
+        setSuccess("Berhasil Daftar! Silakan Login.");
         setActiveTab("login");
+        // Reset form
+        setName("");
+        setEmail("");
+        setPassword("");
       }
     } catch (err: any) {
-      alert(err.message);
+      // Tampilkan pesan error (termasuk error email sudah terdaftar dari backend)
+      setError(err.message);
     } finally {
       setIsLoading(false);
     }
@@ -123,65 +148,110 @@ export const Auth: React.FC<AuthProps> = ({ onBack }) => {
 
           {/* Form */}
           <form className="space-y-4" onSubmit={handleSubmit}>
+            {/* Input Nama (Hanya muncul jika di tab Register) */}
             {activeTab === "register" && (
-              <div className="relative">
-                <User className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" />
+              <div className="relative animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="absolute left-4 top-3.5 text-slate-400">
+                  <User size={18} />
+                </div>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
                   placeholder="Nama Lengkap"
-                  className="w-full pl-12 pr-4 py-3.5 bg-[#fafafa] border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4f46e5]/20 focus:border-[#4f46e5] transition-all text-sm placeholder:text-slate-400 font-medium"
+                  className={`w-full pl-12 pr-4 py-3.5 bg-[#fafafa] border ${
+                    error ? "border-red-200" : "border-slate-200"
+                  } rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4f46e5]/20 focus:border-[#4f46e5] transition-all text-sm placeholder:text-slate-400 font-medium`}
                 />
               </div>
             )}
 
+            {/* Input Email */}
             <div className="relative">
-              <Mail className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" />
+              <div className="absolute left-4 top-3.5 text-slate-400">
+                <Mail size={18} />
+              </div>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                placeholder="Alamat Email"
-                className="w-full pl-12 pr-4 py-3.5 bg-[#fafafa] border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4f46e5]/20 focus:border-[#4f46e5] transition-all text-sm placeholder:text-slate-400 font-medium"
+                placeholder="Email"
+                className={`w-full pl-12 pr-4 py-3.5 bg-[#fafafa] border ${
+                  error ? "border-red-200" : "border-slate-200"
+                } rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4f46e5]/20 focus:border-[#4f46e5] transition-all text-sm placeholder:text-slate-400 font-medium`}
               />
             </div>
 
+            {/* Input Password */}
             <div className="relative">
-              <Lock className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" />
+              <div className="absolute left-4 top-3.5 text-slate-400">
+                <Lock size={18} />
+              </div>
               <input
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 placeholder="Password"
-                className="w-full pl-12 pr-12 py-3.5 bg-[#fafafa] border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4f46e5]/20 focus:border-[#4f46e5] transition-all text-sm placeholder:text-slate-400 font-medium"
+                className={`w-full pl-12 pr-12 py-3.5 bg-[#fafafa] border ${
+                  error ? "border-red-200" : "border-slate-200"
+                } rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4f46e5]/20 focus:border-[#4f46e5] transition-all text-sm placeholder:text-slate-400 font-medium`}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-4 top-3.5 text-slate-400 hover:text-slate-600 transition-colors">
-                {showPassword ? (
-                  <Eye className="h-5 w-5" />
-                ) : (
-                  <EyeOff className="h-5 w-5" />
-                )}
+                {showPassword ? <Eye size={18} /> : <EyeOff size={18} />}
               </button>
             </div>
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-[#4f46e5] hover:bg-indigo-700 text-white py-4 mt-2 rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed text-sm">
-              {isLoading
-                ? "Loading..."
-                : activeTab === "login"
-                  ? "Login ke Akun"
-                  : "Buat Akun Sekarang"}{" "}
-              {!isLoading && <ArrowRight className="w-4 h-4" />}
-            </button>
+            {/* BAGIAN PESAN FEEDBACK (Error & Success) */}
+            <div className="pt-2">
+              {error && (
+                <div className="flex items-center gap-2 text-red-500 bg-red-50 p-3 rounded-xl animate-in slide-in-from-top-2 duration-300 mb-4 border border-red-100">
+                  <AlertCircle size={16} />
+                  <span className="text-[11px] font-bold leading-tight">
+                    {error}
+                  </span>
+                </div>
+              )}
+
+              {success && (
+                <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 p-3 rounded-xl animate-in slide-in-from-top-2 duration-300 mb-4 border border-emerald-100">
+                  <div className="w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center">
+                    <svg
+                      className="w-2.5 h-2.5 text-white"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth="4">
+                      <path d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <span className="text-[11px] font-bold leading-tight">
+                    {success}
+                  </span>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full bg-[#4f46e5] hover:bg-indigo-700 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed text-sm">
+                {isLoading ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>
+                    {activeTab === "login"
+                      ? "Login ke Akun"
+                      : "Buat Akun Sekarang"}
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </div>
           </form>
         </div>
       </div>

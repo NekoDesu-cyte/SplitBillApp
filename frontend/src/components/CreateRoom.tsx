@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   Trash2,
   Info,
+  AlertCircle,
 } from "lucide-react";
 
 interface Item {
@@ -26,6 +27,9 @@ export const CreateRoom: React.FC<{
   const [service, setService] = useState<number>(5);
   const [isLoading, setIsLoading] = useState(false);
 
+  const [error, setError] = useState<string | null>(null); // State error
+  const [success, setSuccess] = useState<string | null>(null); // State sukses
+
   const [isExtracting, setIsExtracting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -35,6 +39,9 @@ export const CreateRoom: React.FC<{
     if (!file) return;
 
     setIsExtracting(true);
+    setError(null); // Reset feedback
+    setSuccess(null);
+
     const formData = new FormData();
     formData.append("receipt", file);
 
@@ -46,7 +53,6 @@ export const CreateRoom: React.FC<{
       const data = await res.json();
 
       if (data.items && data.items.length > 0) {
-        // Gabungkan item yang sudah ada dengan hasil scan OCR
         const scannedItems = data.items.map((it: any, index: number) => ({
           id: Date.now() + index,
           name: it.name,
@@ -54,15 +60,15 @@ export const CreateRoom: React.FC<{
           quantity: it.quantity,
         }));
         setItems([...items, ...scannedItems]);
-        alert(`Berhasil menemukan ${scannedItems.length} menu!`);
+        setSuccess(`Berhasil menemukan ${scannedItems.length} menu!`); // Gunakan UI Success
       } else {
-        alert("Tidak ada teks menu yang terdeteksi dari gambar.");
+        setError("Tidak ada teks menu yang terdeteksi."); // Gunakan UI Error
       }
     } catch (err) {
-      alert("Gagal mengekstrak struk.");
+      setError("Gagal mengekstrak struk. Coba lagi nanti.");
     } finally {
       setIsExtracting(false);
-      if (fileInputRef.current) fileInputRef.current.value = ""; // Reset input
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -83,7 +89,10 @@ export const CreateRoom: React.FC<{
 
   // --- FUNGSI SIMPAN ITEM DARI MODAL ---
   const handleAddItem = () => {
-    if (!newItemName || !newItemPrice) return alert("Isi nama dan harga item!");
+    if (!newItemName || !newItemPrice) {
+      setError("Isi nama dan harga item dulu, ya!");
+      return;
+    }
 
     const newItem: Item = {
       id: Date.now(),
@@ -97,12 +106,17 @@ export const CreateRoom: React.FC<{
     setNewItemName("");
     setNewItemPrice("");
     setNewItemQty(1);
+    setError(null);
     setIsModalOpen(false);
   };
 
   const handleCreate = async () => {
-    if (!name) return alert("Nama ruangan harus diisi!");
+    if (!name) {
+      setError("Nama ruangan jangan lupa diisi!");
+      return;
+    }
     setIsLoading(true);
+    setError(null);
 
     const user = JSON.parse(localStorage.getItem("user") || "{}");
     const payload = {
@@ -133,7 +147,7 @@ export const CreateRoom: React.FC<{
       const data = await res.json();
       onCreate(data.id);
     } catch (e) {
-      alert("Gagal membuat ruangan.");
+      setError("Gagal membuat ruangan. Periksa koneksi Anda.");
     } finally {
       setIsLoading(false);
     }
@@ -393,33 +407,77 @@ export const CreateRoom: React.FC<{
 
           {/* Ringkasan Biaya */}
           <div className="bg-[#f8f9fa] border border-slate-200 rounded-xl p-4 mt-2">
-            <div className="flex justify-between items-center text-xs mb-1.5">
+            <div className="flex justify-between items-center text-xs mb-3">
               <span className="text-slate-500 font-medium">Subtotal</span>
               <span className="text-slate-700 font-bold">
                 {formatRp(subtotal)}
               </span>
             </div>
-            <div className="flex justify-between items-center text-[10px] mb-3">
-              <span className="text-slate-400">Termasuk pajak & layanan</span>
+
+            {/* RINCIAN PAJAK & LAYANAN (DITAMBAHKAN KEMBALI) */}
+            <div className="space-y-2 mb-4 border-t border-dashed border-slate-200 pt-3">
+              <div className="flex justify-between text-[11px] text-slate-500">
+                <span>Pajak ({tax}%)</span>
+                <span>{formatRp((subtotal * tax) / 100)}</span>
+              </div>
+              <div className="flex justify-between text-[11px] text-slate-500">
+                <span>Layanan ({service}%)</span>
+                <span>{formatRp((subtotal * service) / 100)}</span>
+              </div>
             </div>
+
             <div className="flex justify-between items-center pt-3 border-t border-slate-200">
               <span className="text-sm font-bold text-slate-900">
                 Total Akhir
               </span>
-              <span className="text-base font-black text-[#4f46e5]">
+              <span className="text-xl font-black text-[#4f46e5]">
                 {formatRp(totalAkhir)}
               </span>
             </div>
           </div>
 
-          {/* Tombol Buat */}
-          <button
-            onClick={handleCreate}
-            disabled={isLoading}
-            className="w-full bg-[#4f46e5] hover:bg-indigo-700 text-white font-bold text-sm py-4 rounded-xl flex items-center justify-center gap-2 transition-all mt-4 disabled:opacity-50 shadow-md">
-            {isLoading ? "Memproses..." : "Buat Ruangan Sekarang"}{" "}
-            <ArrowRight className="w-4 h-4" />
-          </button>
+          {/* Letakkan ini tepat sebelum tombol "Buat Ruangan Sekarang" */}
+          <div className="mt-6">
+            {error && (
+              <div className="flex items-center gap-2 text-red-500 bg-red-50 p-3.5 rounded-xl animate-in slide-in-from-top-2 duration-300 mb-4 border border-red-100">
+                <AlertCircle size={16} />
+                <span className="text-[11px] font-bold leading-tight">
+                  {error}
+                </span>
+              </div>
+            )}
+
+            {success && (
+              <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 p-3.5 rounded-xl animate-in slide-in-from-top-2 duration-300 mb-4 border border-emerald-100">
+                <div className="w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center">
+                  <svg
+                    className="w-2.5 h-2.5 text-white"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth="4">
+                    <path d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <span className="text-[11px] font-bold leading-tight">
+                  {success}
+                </span>
+              </div>
+            )}
+
+            <button
+              onClick={handleCreate}
+              disabled={isLoading || isExtracting}
+              className="w-full bg-[#4f46e5] hover:bg-indigo-700 text-white font-bold text-sm py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md disabled:opacity-50">
+              {isLoading ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <>
+                  Buat Ruangan Sekarang <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>

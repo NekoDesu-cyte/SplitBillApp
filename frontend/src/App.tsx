@@ -83,6 +83,7 @@ export default function App() {
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [roomCode, setRoomCode] = useState("");
   const [isJoining, setIsJoining] = useState(false);
+  const [error, setError] = useState<string | null>(null); // State baru untuk error
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [user, setUser] = useState<any>(null);
 
@@ -105,8 +106,14 @@ export default function App() {
   };
 
   const handleJoin = async () => {
-    if (!roomCode || roomCode.length < 4)
-      return alert("Masukkan 4 digit kode room!");
+    // Reset error setiap kali tombol ditekan
+    setError(null);
+
+    if (!roomCode || roomCode.length < 4) {
+      setError("Masukkan 4 digit kode room!");
+      return;
+    }
+
     setIsJoining(true);
     try {
       const res = await fetch(
@@ -117,7 +124,7 @@ export default function App() {
       setSelectedRoomId(data.id);
       setView("room-detail");
     } catch (error) {
-      alert("Kode Room salah atau ruangan sudah dihapus.");
+      setError("Kode salah atau room sudah dihapus."); // Set pesan error UI
     } finally {
       setIsJoining(false);
     }
@@ -226,18 +233,33 @@ export default function App() {
             <div className="flex gap-2">
               <input
                 value={roomCode}
-                onChange={(e) => setRoomCode(e.target.value)}
+                onChange={(e) => {
+                  setRoomCode(e.target.value);
+                  if (error) setError(null); // Hilangkan error saat user mengetik ulang
+                }}
                 placeholder="0000"
                 maxLength={4}
-                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-3.5 text-xl font-mono tracking-[0.4em] text-center focus:outline-none focus:border-[#4f46e5] focus:ring-1 focus:ring-[#4f46e5] font-bold text-[#4f46e5]"
+                className={`w-full bg-white border ${error ? "border-red-400" : "border-slate-200"} rounded-xl px-3 py-3.5 text-xl font-mono tracking-[0.4em] text-center focus:outline-none focus:border-[#4f46e5] focus:ring-1 focus:ring-[#4f46e5] font-bold text-[#4f46e5] transition-all`}
               />
               <button
                 onClick={handleJoin}
                 disabled={isJoining}
                 className="px-5 py-3.5 bg-[#4f46e5] text-white rounded-xl font-bold text-sm transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center">
-                {isJoining ? "..." : "Gabung"}
+                {isJoining ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  "Gabung"
+                )}
               </button>
             </div>
+
+            {/* Pesan Error UI yang Setema */}
+            {error && (
+              <div className="mt-3 flex items-center gap-2 text-red-500 bg-red-50 p-3 rounded-xl animate-in slide-in-from-top-2 duration-300">
+                <AlertCircle size={14} />
+                <span className="text-[11px] font-bold">{error}</span>
+              </div>
+            )}
           </div>
 
           <button

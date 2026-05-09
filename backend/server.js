@@ -131,17 +131,62 @@ app.patch("/api/rooms/:roomId/items/:itemId", async (req, res) => {
 
 app.patch("/api/rooms/:roomId/pay", async (req, res) => {
   const { clientId, participantName } = req.body;
-  const [p] =
-    await sql`SELECT * FROM participants WHERE id = ${clientId} AND room_id = ${req.params.roomId}`;
-  if (!p)
-    await sql`INSERT INTO participants (id, room_id, name, is_paid) VALUES (${clientId}, ${req.params.roomId}, ${participantName}, TRUE)`;
-  else
-    await sql`UPDATE participants SET is_paid = TRUE WHERE id = ${clientId} AND room_id = ${req.params.roomId}`;
 
-  // Beritahu semua orang di ruangan ini kalau ada yang lunas
-  io.to(req.params.roomId).emit("updateData");
+  try {
+    // Gunakan ON CONFLICT untuk mencegah duplikasi di level Database
+    await sql`
+      INSERT INTO participants (id, room_id, name, is_paid) 
+      VALUES (${clientId}, ${req.params.roomId}, ${participantName}, TRUE)
+      ON CONFLICT (id, room_id) 
+      DO UPDATE SET is_paid = TRUE, name = ${participantName}
+    `;
 
-  res.json({ success: true });
+    io.to(req.params.roomId).emit("updateData");
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+// Endpoint untuk menutup ruangan (Close Room)
+// TAMBAHKAN INI: Endpoint untuk menutup ruangan
+app.patch("/api/rooms/:roomId/close", async (req, res) => {
+  const { roomId } = req.params;
+  try {
+    // Update status is_closed di database Neon
+    const [result] = await sql`
+      UPDATE rooms 
+      SET is_closed = TRUE 
+      WHERE id = ${roomId} 
+      RETURNING id
+    `;
+
+    if (!result) {
+      return res.status(404).json({ error: "Ruangan tidak ditemukan" });
+    }
+
+    // Beritahu semua orang lewat socket bahwa room sudah tertutup
+    io.to(roomId).emit("updateData");
+
+    res.json({ success: true, message: "Room berhasil ditutup" });
+  } catch (e) {
+    console.error("Error Closing Room:", e);
+    res.status(500).json({ error: "Gagal menutup ruangan di database" });
+  }
+});
+
+// Endpoint untuk mengambil History Room milik User tertentu
+app.get("/api/rooms/user/:userId/history", async (req, res) => {
+  try {
+    // Mengambil room yang dibuat oleh user (host_id)
+    const history = await sql`
+      SELECT * FROM rooms 
+      WHERE host_id = ${req.params.userId} 
+      ORDER BY created_at DESC
+    `;
+    res.json(history);
+  } catch (e) {
+    res.status(500).json({ error: "Gagal mengambil history" });
+  }
 });
 
 // --- LOGIKA SOCKET.IO ---
