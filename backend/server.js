@@ -1,0 +1,129 @@
+import express from "express";
+import { createServer } from "http";
+import { Server } from "socket.io";
+import cors from "cors";
+import { neon } from "@neondatabase/serverless";
+import "dotenv/config";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+
+const JWT_SECRET = "SplitBillSecret2026";
+const app = express();
+const httpServer = createServer(app);
+const io = new Server(httpServer, { cors: { origin: "*" } });
+
+app.use(cors());
+app.use(express.json());
+const sql = neon(process.env.DATABASE_URL);
+
+// --- AUTH API ---
+app.post("/api/auth/register", async (req, res) => {
+  const { name, email, password } = req.body;
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const [user] =
+      await sql`INSERT INTO users (name, email, password) VALUES (${name}, ${email.toLowerCase()}, ${hashedPassword}) RETURNING id, name, email`;
+    res.json(user);
+  } catch (e) {
+    res.status(400).json({ error: "Email sudah ada" });
+  }
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    const [user] =
+      await sql`SELECT * FROM users WHERE email = ${email.toLowerCase()}`;
+    if (!user || !(await bcrypt.compare(password, user.password)))
+      return res.status(400).json({ error: "Email/Password salah" });
+    const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: "7d" });
+    res.json({
+      token,
+      user: { id: user.id, name: user.name, email: user.email },
+    });
+  } catch (e) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// --- ROOM API ---
+app.post("/api/rooms", async (req, res) => {
+  const {
+    name,
+    hostId,
+    code,
+    taxPercent,
+    servicePercent,
+    paymentInfo,
+    items,
+    hostPart,
+    creatorId,
+  } = req.body;
+  try {
+    const [room] =
+      await sql`INSERT INTO rooms (name, host_id, code, tax_percent, service_percent, payment_provider, payment_account, creator_id) VALUES (${name}, ${hostId}, ${code}, ${taxPercent}, ${servicePercent}, ${paymentInfo.provider}, ${paymentInfo.accountNumber}, ${creatorId || null}) RETURNING *`;
+    await sql`INSERT INTO participants (id, room_id, name, avatar, role) VALUES (${hostPart.id}, ${room.id}, ${hostPart.name}, ${hostPart.avatar}, 'OWNER')`;
+    for (const item of items) {
+      await sql`INSERT INTO items (room_id, name, price, total_quantity) VALUES (${room.id}, ${item.name}, ${item.price}, ${item.quantity})`;
+    }
+    res.status(201).json(room);
+  } catch (e) {
+    res.status(500).json({ error: "Gagal" });
+  }
+});
+
+app.get("/api/rooms/:id", async (req, res) => {
+  const [room] = await sql`SELECT * FROM rooms WHERE id = ${req.params.id}`;
+  const items =
+    await sql`SELECT * FROM items WHERE room_id = ${req.params.id} ORDER BY name ASC`;
+  const participants =
+    await sql`SELECT * FROM participants WHERE room_id = ${req.params.id}`;
+  res.json({ ...room, items, participants });
+});
+
+app.get("/api/rooms/code/:code", async (req, res) => {
+  const [room] =
+    await sql`SELECT id FROM rooms WHERE code = ${req.params.code}`;
+  if (!room) return res.status(404).json({ error: "Not found" });
+  res.json({ id: room.id });
+});
+
+app.patch("/api/rooms/:roomId/items/:itemId", async (req, res) => {
+  await sql`UPDATE items SET claims = ${req.body.claims} WHERE id = ${req.params.itemId}`;
+
+  // Beritahu semua orang di ruangan ini bahwa ada perubahan data
+  io.to(req.params.roomId).emit("updateData");
+
+  res.json({ success: true });
+});
+
+app.patch("/api/rooms/:roomId/pay", async (req, res) => {
+  const { clientId, participantName } = req.body;
+  const [p] =
+    await sql`SELECT * FROM participants WHERE id = ${clientId} AND room_id = ${req.params.roomId}`;
+  if (!p)
+    await sql`INSERT INTO participants (id, room_id, name, is_paid) VALUES (${clientId}, ${req.params.roomId}, ${participantName}, TRUE)`;
+  else
+    await sql`UPDATE participants SET is_paid = TRUE WHERE id = ${clientId} AND room_id = ${req.params.roomId}`;
+
+  // Beritahu semua orang di ruangan ini kalau ada yang lunas
+  io.to(req.params.roomId).emit("updateData");
+
+  res.json({ success: true });
+});
+
+// --- LOGIKA SOCKET.IO ---
+io.on("connection", (socket) => {
+  console.log("✅ User connected:", socket.id);
+
+  socket.on("joinRoom", (roomId) => {
+    socket.join(roomId);
+    console.log(`🏠 User ${socket.id} bergabung ke Room: ${roomId}`);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("❌ User disconnected:", socket.id);
+  });
+});
+
+httpServer.listen(5000, () => console.log("🚀 Server Ready"));
