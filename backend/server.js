@@ -7,6 +7,10 @@ import "dotenv/config";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
+import multer from "multer";
+import { exec } from "child_process";
+import fs from "fs";
+
 const JWT_SECRET = "SplitBillSecret2026";
 const app = express();
 const httpServer = createServer(app);
@@ -15,6 +19,9 @@ const io = new Server(httpServer, { cors: { origin: "*" } });
 app.use(cors());
 app.use(express.json());
 const sql = neon(process.env.DATABASE_URL);
+
+// Konfigurasi folder penampung foto sementara
+const upload = multer({ dest: "uploads/" });
 
 // --- AUTH API ---
 app.post("/api/auth/register", async (req, res) => {
@@ -44,6 +51,31 @@ app.post("/api/auth/login", async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: "Server error" });
   }
+});
+
+// --- OCR API ---
+app.post("/api/ocr", upload.single("receipt"), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "Foto tidak ditemukan" });
+
+  const imagePath = req.file.path;
+
+  // Jalankan script Python
+  exec(`python extract.py "${imagePath}"`, (error, stdout, stderr) => {
+    // Hapus foto setelah berhasil dibaca agar memori tidak penuh
+    fs.unlinkSync(imagePath);
+
+    if (error) {
+      console.error("OCR Error:", error);
+      return res.status(500).json({ error: "Gagal memproses struk" });
+    }
+
+    try {
+      const items = JSON.parse(stdout);
+      res.json({ items });
+    } catch (e) {
+      res.status(500).json({ error: "Gagal membaca hasil OCR" });
+    }
+  });
 });
 
 // --- ROOM API ---

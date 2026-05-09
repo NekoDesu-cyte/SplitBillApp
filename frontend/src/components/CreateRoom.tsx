@@ -1,14 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   ArrowRight,
   Receipt,
   Plus,
   Wand2,
   ArrowLeft,
-  Minus,
   Trash2,
   Info,
-  X,
 } from "lucide-react";
 
 interface Item {
@@ -27,6 +25,46 @@ export const CreateRoom: React.FC<{
   const [tax, setTax] = useState<number>(10);
   const [service, setService] = useState<number>(5);
   const [isLoading, setIsLoading] = useState(false);
+
+  const [isExtracting, setIsExtracting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Fungsi untuk kirim foto ke Backend
+  const handleUploadStruk = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsExtracting(true);
+    const formData = new FormData();
+    formData.append("receipt", file);
+
+    try {
+      const res = await fetch("http://localhost:5000/api/ocr", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+
+      if (data.items && data.items.length > 0) {
+        // Gabungkan item yang sudah ada dengan hasil scan OCR
+        const scannedItems = data.items.map((it: any, index: number) => ({
+          id: Date.now() + index,
+          name: it.name,
+          price: it.price,
+          quantity: it.quantity,
+        }));
+        setItems([...items, ...scannedItems]);
+        alert(`Berhasil menemukan ${scannedItems.length} menu!`);
+      } else {
+        alert("Tidak ada teks menu yang terdeteksi dari gambar.");
+      }
+    } catch (err) {
+      alert("Gagal mengekstrak struk.");
+    } finally {
+      setIsExtracting(false);
+      if (fileInputRef.current) fileInputRef.current.value = ""; // Reset input
+    }
+  };
 
   // --- STATE UNTUK MODAL TAMBAH ITEM ---
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -102,125 +140,135 @@ export const CreateRoom: React.FC<{
   };
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] pb-20 font-sans text-slate-800">
-      {/* MODAL TAMBAH ITEM (SESUAI GAMBAR) */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
-            onClick={() => setIsModalOpen(false)}></div>
-          <div className="relative bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl animate-in fade-in zoom-in duration-200">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-slate-900 mb-2">
-                Tambah Item
-              </h2>
-              <p className="text-slate-500 text-sm">
-                Tambahkan item yang tidak terbaca oleh sistem atau input secara
-                manual.
-              </p>
-            </div>
-
-            <div className="space-y-5">
-              {/* Input Nama Item */}
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700">
-                  Nama Item
-                </label>
-                <input
-                  value={newItemName}
-                  onChange={(e) => setNewItemName(e.target.value)}
-                  placeholder="Misal: Nasi Goreng"
-                  className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:border-[#4f46e5] outline-none font-medium"
-                />
-              </div>
-
-              {/* Input Harga & Jumlah */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">
-                    Harga
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">
-                      Rp
-                    </span>
-                    <input
-                      value={newItemPrice}
-                      onChange={(e) => setNewItemPrice(e.target.value)}
-                      placeholder="45.000"
-                      className="w-full pl-11 pr-4 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:border-[#4f46e5] outline-none font-bold"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">
-                    Jumlah
-                  </label>
-                  <input
-                    type="number"
-                    value={newItemQty}
-                    onChange={(e) => setNewItemQty(Number(e.target.value))}
-                    className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:border-[#4f46e5] outline-none font-bold text-center"
-                  />
-                </div>
-              </div>
-
-              {/* Info Box */}
-              <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 flex gap-3 items-start">
-                <div className="w-5 h-5 bg-[#4f46e5] text-white rounded-full flex items-center justify-center shrink-0 mt-0.5">
-                  <Info size={12} />
-                </div>
-                <p className="text-[13px] text-indigo-700 leading-relaxed">
-                  Item ini akan langsung ditambahkan ke daftar tagihan room
-                  Anda.
+    // 1. Background utama PC (Abu-abu, konten terpusat)
+    <div className="min-h-screen bg-slate-100 flex justify-center font-sans text-slate-800 overflow-x-hidden">
+      {/* 2. Kontainer Mobile (Maksimal 480px) */}
+      <div className="w-full max-w-[480px] bg-white min-h-screen shadow-2xl relative flex flex-col pb-10">
+        {/* MODAL TAMBAH ITEM */}
+        {isModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+              onClick={() => setIsModalOpen(false)}></div>
+            <div className="relative bg-white w-full max-w-[360px] rounded-[2rem] p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
+              <div className="text-center mb-6">
+                <h2 className="text-xl font-bold text-slate-900 mb-1.5">
+                  Tambah Item
+                </h2>
+                <p className="text-slate-500 text-[11px] px-2 leading-relaxed">
+                  Tambahkan item yang tidak terbaca oleh sistem atau input
+                  secara manual.
                 </p>
               </div>
 
-              {/* Buttons */}
-              <button
-                onClick={handleAddItem}
-                className="w-full bg-[#4f46e5] text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all">
-                <Plus size={20} /> Simpan Item
-              </button>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="w-full text-slate-400 font-semibold text-sm hover:text-slate-600 transition-colors">
-                Batal
-              </button>
+              <div className="space-y-4">
+                {/* Input Nama Item */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700">
+                    Nama Item
+                  </label>
+                  <input
+                    value={newItemName}
+                    onChange={(e) => setNewItemName(e.target.value)}
+                    placeholder="Misal: Nasi Goreng"
+                    className="w-full px-4 py-3 rounded-xl bg-[#fafafa] border border-slate-200 focus:border-[#4f46e5] outline-none text-sm font-medium transition-all"
+                  />
+                </div>
+
+                {/* Input Harga & Jumlah */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-700">
+                      Harga
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">
+                        Rp
+                      </span>
+                      <input
+                        value={newItemPrice}
+                        onChange={(e) => setNewItemPrice(e.target.value)}
+                        placeholder="45.000"
+                        className="w-full pl-9 pr-3 py-3 rounded-xl bg-[#fafafa] border border-slate-200 focus:border-[#4f46e5] outline-none text-sm font-bold transition-all"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-700">
+                      Jumlah
+                    </label>
+                    <input
+                      type="number"
+                      value={newItemQty}
+                      onChange={(e) => setNewItemQty(Number(e.target.value))}
+                      className="w-full px-4 py-3 rounded-xl bg-[#fafafa] border border-slate-200 focus:border-[#4f46e5] outline-none text-sm font-bold text-center transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* Info Box */}
+                <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 flex gap-2.5 items-start mt-2">
+                  <div className="w-4 h-4 bg-[#4f46e5] text-white rounded-full flex items-center justify-center shrink-0 mt-0.5">
+                    <Info size={10} />
+                  </div>
+                  <p className="text-[11px] text-indigo-700 leading-relaxed font-medium">
+                    Item ini akan langsung ditambahkan ke daftar tagihan room
+                    Anda.
+                  </p>
+                </div>
+
+                {/* Buttons */}
+                <div className="pt-2 flex flex-col gap-2">
+                  <button
+                    onClick={handleAddItem}
+                    className="w-full bg-[#4f46e5] text-white py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-sm hover:bg-indigo-700 active:scale-95 transition-all">
+                    <Plus size={16} /> Simpan Item
+                  </button>
+                  <button
+                    onClick={() => setIsModalOpen(false)}
+                    className="w-full py-3 text-slate-400 font-semibold text-xs hover:text-slate-600 transition-colors">
+                    Batal
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* HEADER UTAMA */}
-      <div className="bg-white border-b border-slate-200 sticky top-0 z-10 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-center relative px-6">
-          <button
-            onClick={onBack}
-            className="absolute left-4 md:left-6 p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-600">
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-          <span className="font-display font-extrabold text-xl tracking-tight text-[#4f46e5]">
-            BagiBayar
-          </span>
-        </div>
-      </div>
+        {/* Navbar / Header Minimalis */}
+        <nav className="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-40 w-full">
+          <div className="px-5 h-16 flex items-center relative">
+            <button
+              onClick={onBack}
+              className="absolute left-4 p-2 text-slate-400 hover:text-slate-800 hover:bg-slate-50 rounded-full transition-all flex items-center justify-center">
+              <ArrowLeft className="w-6 h-6" />
+            </button>
+            <div className="flex-1 flex justify-center items-center gap-2">
+              <div className="w-7 h-7 bg-[#4f46e5] rounded-lg flex items-center justify-center shadow-sm">
+                <Receipt className="text-white w-4 h-4" />
+              </div>
+              <span className="font-display font-extrabold text-lg tracking-tight text-[#4f46e5]">
+                BagiBayar
+              </span>
+            </div>
+          </div>
+        </nav>
 
-      <div className="max-w-xl mx-auto px-4 pt-10">
-        <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-8 sm:p-10">
-          <div className="text-center mb-10">
-            <h1 className="text-[1.75rem] font-bold mb-3 text-slate-900 tracking-tight">
+        {/* Konten Utama */}
+        <div className="px-5 pt-8 pb-10 flex-1">
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-bold mb-1.5 text-slate-900 tracking-tight">
               Buat Ruangan
             </h1>
-            <p className="text-slate-500 text-sm font-medium">
+            <p className="text-slate-500 text-xs font-medium px-4">
               Atur tagihan dan undang teman untuk patungan.
             </p>
           </div>
 
-          <div className="space-y-7">
+          <div className="space-y-6">
             {/* Input Nama Ruangan */}
             <div>
-              <label className="block text-[13px] font-semibold text-slate-700 mb-2.5">
+              <label className="block text-xs font-bold text-slate-700 mb-2">
                 Nama Ruangan <span className="text-red-500">*</span>
               </label>
               <input
@@ -228,128 +276,150 @@ export const CreateRoom: React.FC<{
                 onChange={(e) => setName(e.target.value)}
                 type="text"
                 placeholder="Misal: Makan Malam di Sushi Tei"
-                className="w-full px-4 py-3.5 rounded-xl bg-[#fafafa] border border-slate-200 focus:border-[#4f46e5] outline-none transition-all text-sm font-bold"
+                className="w-full px-4 py-3.5 rounded-xl bg-[#fafafa] border border-slate-200 focus:border-[#4f46e5] focus:ring-1 focus:ring-[#4f46e5] outline-none transition-all text-sm font-bold"
               />
             </div>
 
             {/* Unggah Struk Section */}
             <div>
               <label className="block text-[13px] font-semibold text-slate-700 mb-2.5">
-                Unggah Struk
+                Unggah Struk (Otomatis deteksi menu)
               </label>
-              <div className="border-2 border-dashed border-[#d1d5db] rounded-2xl p-8 flex flex-col items-center justify-center gap-3 bg-[#fafafa] hover:bg-slate-50 transition-colors cursor-pointer">
+
+              {/* Input File Tersembunyi */}
+              <input
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                onChange={handleUploadStruk}
+                className="hidden"
+              />
+
+              <div
+                onClick={() => !isExtracting && fileInputRef.current?.click()}
+                className={`border-2 border-dashed border-[#d1d5db] rounded-2xl p-8 flex flex-col items-center justify-center gap-3 bg-[#fafafa] hover:bg-slate-50 transition-colors cursor-pointer ${isExtracting ? "opacity-60 cursor-not-allowed" : ""}`}>
                 <Receipt className="w-8 h-8 text-slate-500" strokeWidth={1.5} />
-                <p className="text-[13px] font-medium text-slate-500">
-                  Klik atau tarik file struk ke sini
+                <p className="text-[13px] font-medium text-slate-500 text-center">
+                  {isExtracting
+                    ? "Sedang mengekstrak teks dengan AI..."
+                    : "Klik untuk memilih foto struk dari galeri/komputer"}
                 </p>
-                <button className="mt-2 bg-[#eef2ff] text-[#4f46e5] hover:bg-indigo-100 transition-colors px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2">
-                  <Wand2 className="w-4 h-4" /> Ekstrak Item
+                <button
+                  disabled={isExtracting}
+                  className="mt-2 bg-[#eef2ff] text-[#4f46e5] hover:bg-indigo-100 transition-colors px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2">
+                  <Wand2
+                    className={`w-4 h-4 ${isExtracting ? "animate-spin" : ""}`}
+                  />
+                  {isExtracting ? "Membaca..." : "Ekstrak Item"}
                 </button>
               </div>
             </div>
+          </div>
 
-            {/* Daftar Item Section */}
-            <div>
-              <div className="flex justify-between items-end mb-3">
-                <label className="block text-[13px] font-semibold text-slate-700">
-                  Daftar Item
-                </label>
-                {/* BUTTON UNTUK MEMBUKA MODAL */}
-                <button
-                  onClick={() => setIsModalOpen(true)}
-                  className="text-[#4f46e5] hover:text-indigo-700 text-[13px] font-bold flex items-center gap-1 bg-indigo-50 px-3 py-1.5 rounded-lg transition-all">
-                  <Plus className="w-[14px] h-[14px]" strokeWidth={2.5} />{" "}
-                  Tambah Item
-                </button>
-              </div>
+          {/* Daftar Item Section */}
+          <div>
+            <div className="flex justify-between items-end mb-3">
+              <label className="block text-xs font-bold text-slate-700">
+                Daftar Pesanan
+              </label>
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="text-[#4f46e5] hover:bg-indigo-100 text-[11px] font-bold flex items-center gap-1 bg-indigo-50 px-2.5 py-1.5 rounded-md transition-all">
+                <Plus className="w-3 h-3" strokeWidth={2.5} /> Tambah Item
+              </button>
+            </div>
 
-              <div className="space-y-3">
-                {items.length === 0 ? (
-                  <div className="text-center py-6 border border-dashed border-slate-200 rounded-xl text-slate-400 text-xs">
-                    Belum ada item.
-                  </div>
-                ) : (
-                  items.map((item) => (
-                    <div
-                      key={item.id}
-                      className="bg-white border border-slate-200 rounded-xl p-4 flex justify-between items-center shadow-sm">
-                      <div>
-                        <div className="text-sm font-bold text-slate-800">
-                          {item.name}
-                        </div>
-                        <div className="text-[11px] text-[#4f46e5] font-bold mt-1">
-                          {item.quantity}x {formatRp(item.price)}
-                        </div>
+            <div className="space-y-2.5">
+              {items.length === 0 ? (
+                <div className="text-center py-6 border border-dashed border-slate-200 rounded-xl text-slate-400 text-xs bg-[#fafafa]">
+                  Belum ada pesanan yang ditambahkan.
+                </div>
+              ) : (
+                items.map((item) => (
+                  <div
+                    key={item.id}
+                    className="bg-white border border-slate-200 rounded-xl p-3.5 flex justify-between items-center shadow-sm">
+                    <div>
+                      <div className="text-[13px] font-bold text-slate-800">
+                        {item.name}
                       </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-sm font-black text-slate-900">
-                          {formatRp(item.price * item.quantity)}
-                        </div>
-                        <button
-                          onClick={() =>
-                            setItems(items.filter((it) => it.id !== item.id))
-                          }
-                          className="text-red-400 hover:text-red-600 p-1">
-                          <Trash2 size={16} />
-                        </button>
+                      <div className="text-[10px] text-[#4f46e5] font-bold mt-0.5">
+                        {item.quantity}x {formatRp(item.price)}
                       </div>
                     </div>
-                  ))
-                )}
-              </div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-[13px] font-black text-slate-900">
+                        {formatRp(item.price * item.quantity)}
+                      </div>
+                      <button
+                        onClick={() =>
+                          setItems(items.filter((it) => it.id !== item.id))
+                        }
+                        className="text-red-400 hover:text-red-600 bg-red-50 p-1.5 rounded-md transition-colors">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
-
-            {/* Pajak & Servis */}
-            <div className="grid grid-cols-2 gap-4 pt-2">
-              <div>
-                <label className="block text-[13px] font-semibold text-slate-700 mb-2.5">
-                  Pajak (%)
-                </label>
-                <input
-                  type="number"
-                  value={tax}
-                  onChange={(e) => setTax(Number(e.target.value))}
-                  className="w-full px-4 py-3.5 rounded-xl bg-[#fafafa] border border-slate-200 outline-none focus:border-[#4f46e5] font-bold"
-                />
-              </div>
-              <div>
-                <label className="block text-[13px] font-semibold text-slate-700 mb-2.5">
-                  Servis (%)
-                </label>
-                <input
-                  type="number"
-                  value={service}
-                  onChange={(e) => setService(Number(e.target.value))}
-                  className="w-full px-4 py-3.5 rounded-xl bg-[#fafafa] border border-slate-200 outline-none focus:border-[#4f46e5] font-bold"
-                />
-              </div>
-            </div>
-
-            <div className="bg-[#f5f6ff] rounded-xl p-5 mt-2 space-y-1.5">
-              <div className="flex justify-between items-center text-[13px]">
-                <span className="text-slate-500 font-medium">Subtotal</span>
-                <span className="text-slate-500 font-semibold">
-                  {formatRp(subtotal)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center pt-1">
-                <span className="text-lg font-bold text-slate-900">
-                  Total Akhir
-                </span>
-                <span className="text-xl font-bold text-[#4f46e5]">
-                  {formatRp(totalAkhir)}
-                </span>
-              </div>
-            </div>
-
-            <button
-              onClick={handleCreate}
-              disabled={isLoading}
-              className="w-full bg-[#4f46e5] hover:bg-indigo-700 text-white font-bold text-[15px] py-4 rounded-2xl flex items-center justify-center gap-2 transition-all mt-6 disabled:opacity-50 shadow-lg shadow-indigo-100">
-              {isLoading ? "Membuat..." : "Buat Ruangan"}{" "}
-              <ArrowRight className="w-4 h-4" />
-            </button>
           </div>
+
+          {/* Pajak & Servis */}
+          <div className="grid grid-cols-2 gap-3 pt-2">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-2">
+                Pajak (%)
+              </label>
+              <input
+                type="number"
+                value={tax}
+                onChange={(e) => setTax(Number(e.target.value))}
+                className="w-full px-4 py-3 rounded-xl bg-[#fafafa] border border-slate-200 outline-none focus:border-[#4f46e5] focus:ring-1 focus:ring-[#4f46e5] text-sm font-bold transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-2">
+                Biaya Layanan (%)
+              </label>
+              <input
+                type="number"
+                value={service}
+                onChange={(e) => setService(Number(e.target.value))}
+                className="w-full px-4 py-3 rounded-xl bg-[#fafafa] border border-slate-200 outline-none focus:border-[#4f46e5] focus:ring-1 focus:ring-[#4f46e5] text-sm font-bold transition-all"
+              />
+            </div>
+          </div>
+
+          {/* Ringkasan Biaya */}
+          <div className="bg-[#f8f9fa] border border-slate-200 rounded-xl p-4 mt-2">
+            <div className="flex justify-between items-center text-xs mb-1.5">
+              <span className="text-slate-500 font-medium">Subtotal</span>
+              <span className="text-slate-700 font-bold">
+                {formatRp(subtotal)}
+              </span>
+            </div>
+            <div className="flex justify-between items-center text-[10px] mb-3">
+              <span className="text-slate-400">Termasuk pajak & layanan</span>
+            </div>
+            <div className="flex justify-between items-center pt-3 border-t border-slate-200">
+              <span className="text-sm font-bold text-slate-900">
+                Total Akhir
+              </span>
+              <span className="text-base font-black text-[#4f46e5]">
+                {formatRp(totalAkhir)}
+              </span>
+            </div>
+          </div>
+
+          {/* Tombol Buat */}
+          <button
+            onClick={handleCreate}
+            disabled={isLoading}
+            className="w-full bg-[#4f46e5] hover:bg-indigo-700 text-white font-bold text-sm py-4 rounded-xl flex items-center justify-center gap-2 transition-all mt-4 disabled:opacity-50 shadow-md">
+            {isLoading ? "Memproses..." : "Buat Ruangan Sekarang"}{" "}
+            <ArrowRight className="w-4 h-4" />
+          </button>
         </div>
       </div>
     </div>
