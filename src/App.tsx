@@ -9,9 +9,25 @@ import { RoomDetail } from './components/RoomDetail';
 import { Auth } from './components/Auth'; 
 
 export default function App() {
+  // State untuk navigasi antar halaman
   const [view, setView] = useState<'landing' | 'create-room' | 'room-detail' | 'auth' | 'payment'>('landing');
+  
+  // State untuk Dummy Login (false = belum login, true = sudah login)
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  // Logika Perpindahan Halaman
+  // Fungsi untuk menangani klik tombol Create Room
+  const handleCreateRoomClick = () => {
+    if (isLoggedIn) {
+      setView('create-room'); // Jika sudah login, masuk ke halaman buat ruangan
+    } else {
+      setView('auth'); // Jika belum login, paksa ke halaman login dulu
+    }
+  };
+
+  // ==========================================
+  // LOGIKA PERPINDAHAN HALAMAN (ROUTING)
+  // ==========================================
+  
   if (view === 'room-detail') {
     return (
       <RoomDetail 
@@ -35,10 +51,20 @@ export default function App() {
   }
 
   if (view === 'auth') {
-    return <Auth onBack={() => setView('landing')} />;
+    return (
+      <Auth 
+        onBack={() => setView('landing')} 
+        onLogin={() => {
+          setIsLoggedIn(true); // Ubah status jadi sudah login
+          setView('landing');  // Kembali ke landing page setelah login sukses
+        }}
+      />
+    );
   }
 
-  // Jika state 'view' adalah 'landing', render landing page dalam wujud mobile (Max width 480px)
+  // ==========================================
+  // TAMPILAN HALAMAN UTAMA (LANDING PAGE)
+  // ==========================================
   return (
     // Background utama abu-abu untuk di layar PC/Desktop
     <div className="min-h-screen bg-slate-100 flex justify-center font-sans text-slate-900">
@@ -46,18 +72,32 @@ export default function App() {
       {/* Kontainer Putih (Simulasi Layar HP) */}
       <div className="w-full max-w-[480px] bg-white min-h-screen shadow-2xl relative overflow-x-hidden flex flex-col">
         
-        {/* Navbar - Diganti jadi sticky biar ga keluar dari kontainer */}
+        {/* Navbar */}
         <nav className="sticky top-0 w-full bg-white/80 backdrop-blur-md z-50 border-b border-slate-100">
           <div className="px-5 py-4 flex justify-between items-center">
-            <div className="flex items-center gap-2">
+            {/* Logo */}
+            <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView('landing')}>
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                 <Receipt className="text-white w-5 h-5" />
               </div>
               <span className="font-display font-bold text-xl tracking-tight">BagiBayar</span>
             </div>
-            <Button onClick={() => setView('auth')} variant="outline" className="py-2 px-5 text-sm">
-              Login
-            </Button>
+            
+            {/* Tampilan Navbar Berubah Tergantung Status Login */}
+            {isLoggedIn ? (
+              <div className="flex items-center gap-3">
+                <Button onClick={handleCreateRoomClick} className="py-1.5 px-4 text-xs">
+                  Create Room
+                </Button>
+                <div className="w-8 h-8 rounded-full overflow-hidden border border-slate-200 cursor-pointer">
+                  <img src="https://i.pravatar.cc/150?u=alex" alt="User" className="w-full h-full object-cover" />
+                </div>
+              </div>
+            ) : (
+              <Button onClick={() => setView('auth')} variant="outline" className="py-2 px-5 text-sm">
+                Login
+              </Button>
+            )}
           </div>
         </nav>
 
@@ -72,7 +112,7 @@ export default function App() {
             </p>
             <div className="flex flex-col gap-3 w-full">
               <Button 
-                onClick={() => setView('create-room')} 
+                onClick={handleCreateRoomClick} 
                 className="flex items-center justify-center gap-2 w-full py-3.5"
               >
                 Create Room <ArrowRight className="w-5 h-5" />
@@ -121,6 +161,7 @@ export default function App() {
               { title: "Auto Summary WhatsApp", desc: "Kirim ringkasan tagihan otomatis ke WhatsApp grup dengan satu klik." }
             ].map((item, i) => (
               <div key={i} className="flex flex-col items-center">
+                {/* flex justify-center ditambahkan agar gambar ada di tengah */}
                 <div className="w-48 mb-5 flex justify-center">
                   <SolutionIllustration />
                 </div>
@@ -176,7 +217,7 @@ export default function App() {
               Bergabunglah dengan ribuan pengguna yang sudah meninggalkan cara lama yang ribet.
             </p>
             <Button 
-              onClick={() => setView('create-room')} 
+              onClick={handleCreateRoomClick} 
               className="text-base py-4 w-full shadow-xl"
             >
               Create Room Now

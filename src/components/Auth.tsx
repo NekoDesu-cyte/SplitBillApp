@@ -3,13 +3,20 @@ import { Receipt, Mail, Lock, EyeOff, Eye, User, Info, ArrowRight, ArrowLeft } f
 
 interface AuthProps {
   onBack: () => void;
+  onLogin?: () => void; 
   initialTab?: 'login' | 'register';
 }
 
-export const Auth: React.FC<AuthProps> = ({ onBack, initialTab = 'login' }) => {
+export const Auth: React.FC<AuthProps> = ({ onBack, onLogin, initialTab = 'login' }) => {
   const [activeTab, setActiveTab] = useState<'login' | 'register'>(initialTab);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (onLogin) {
+      onLogin(); // Eksekusi fungsi login
+    }
+  };
 
   return (
     // =========================================================================
@@ -79,7 +86,7 @@ export const Auth: React.FC<AuthProps> = ({ onBack, initialTab = 'login' }) => {
           </div>
 
           {/* Forms */}
-          <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+          <form className="space-y-4" onSubmit={handleSubmit}>
             
             {/* Form: Full Name (Hanya untuk Create Account) */}
             {activeTab === 'register' && (
@@ -208,5 +215,7 @@ export const Auth: React.FC<AuthProps> = ({ onBack, initialTab = 'login' }) => {
         </div>
       </div>
     </div>
+
+    
   );
 };
