@@ -80,7 +80,7 @@ export const RoomDetail: React.FC<{
           {/* Logo bisa diklik untuk onBack */}
           <div className="flex items-center cursor-pointer" onClick={onBack}>
             <span className="font-display font-extrabold text-xl tracking-tight text-[#4f46e5]">
-              SplitBill
+              BagiBayar
             </span>
           </div>
           <div className="flex items-center gap-5 text-slate-500">

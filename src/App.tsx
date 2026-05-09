@@ -51,7 +51,7 @@ export default function App() {
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
               <Receipt className="text-white w-5 h-5" />
             </div>
-            <span className="font-display font-bold text-xl tracking-tight">SplitBill</span>
+            <span className="font-display font-bold text-xl tracking-tight">BagiBayar</span>
           </div>
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
             <a href="#problem" className="hover:text-primary transition-colors">Problem</a>
@@ -190,10 +190,10 @@ export default function App() {
             <div className="w-6 h-6 bg-primary rounded flex items-center justify-center">
               <Receipt className="text-white w-4 h-4" />
             </div>
-            <span className="font-display font-bold text-lg tracking-tight">SplitBill</span>
+            <span className="font-display font-bold text-lg tracking-tight">BagiBayar</span>
           </div>
           <p className="text-slate-500 text-sm">
-            &copy; {new Date().getFullYear()} SplitBill. All rights reserved.
+            &copy; {new Date().getFullYear()} BagiBayar. All rights reserved.
           </p>
           <div className="flex gap-6 text-slate-400">
             <a href="#" className="hover:text-primary transition-colors">Privacy</a>

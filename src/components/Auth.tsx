@@ -28,7 +28,7 @@ export const Auth: React.FC<AuthProps> = ({ onBack, initialTab = 'login' }) => {
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
             <Receipt className="text-white w-5 h-5" />
           </div>
-          <span className="font-display font-bold text-2xl tracking-tight text-blue-600">SplitBill</span>
+          <span className="font-display font-bold text-2xl tracking-tight text-blue-600">BagiBayar</span>
         </div>
 
         {/* Title & Subtitle */}

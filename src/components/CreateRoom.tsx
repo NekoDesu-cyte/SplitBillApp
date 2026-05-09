@@ -46,7 +46,7 @@ export const CreateRoom: React.FC<{
           </button>
 
           <span className="font-display font-extrabold text-xl tracking-tight text-[#4f46e5]">
-            SplitBill
+            BagiBayar
           </span>
         </div>
       </div>
