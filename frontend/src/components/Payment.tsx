@@ -74,15 +74,25 @@ export const Payment: React.FC<{ roomId: string; onBack: () => void }> = ({
   const handlePay = async () => {
     setIsConfirming(true);
     try {
-      const clientId = localStorage.getItem("splitbill_client_id") || "guest";
-      const guestName = localStorage.getItem(`guest_name_${roomId}`);
+      // --- FIX LOGIKA IDENTITAS ---
+      const savedUser = localStorage.getItem("user");
+      let clientId = localStorage.getItem("splitbill_client_id") || "guest";
+      let participantName =
+        localStorage.getItem(`guest_name_${roomId}`) || "User";
+
+      // Jika user sudah login (Host), gunakan ID dan Nama aslinya!
+      if (savedUser) {
+        const user = JSON.parse(savedUser);
+        clientId = String(user.id);
+        participantName = user.name;
+      }
 
       await fetch(`http://localhost:5000/api/rooms/${roomId}/pay`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           clientId,
-          participantName: guestName || "User",
+          participantName,
         }),
       });
 

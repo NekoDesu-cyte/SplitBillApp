@@ -141,6 +141,8 @@ app.patch("/api/rooms/:roomId/pay", async (req, res) => {
       DO UPDATE SET is_paid = TRUE, name = ${participantName}
     `;
 
+    io.to(req.params.roomId).emit("paymentNotification", { participantName });
+
     io.to(req.params.roomId).emit("updateData");
     res.json({ success: true });
   } catch (e) {
@@ -196,6 +198,11 @@ io.on("connection", (socket) => {
   socket.on("joinRoom", (roomId) => {
     socket.join(roomId);
     console.log(`🏠 User ${socket.id} bergabung ke Room: ${roomId}`);
+  });
+
+  socket.on("leaveRoom", (roomId) => {
+    socket.leave(roomId);
+    console.log(`🚪 User ${socket.id} keluar dari Room: ${roomId}`);
   });
 
   socket.on("disconnect", () => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Bell,
   Copy,
@@ -12,9 +12,7 @@ import {
   ArrowLeft,
   AlertCircle,
 } from "lucide-react";
-import { io } from "socket.io-client";
-
-const socket = io("http://localhost:5000");
+import { socket } from "../socket";
 
 // --- MODAL KENALAN GUEST ---
 const GuestNameModal = ({
@@ -120,6 +118,37 @@ export const RoomDetail: React.FC<{
   const [success, setSuccess] = useState<string | null>(null);
   const [showConfirmClose, setShowConfirmClose] = useState(false);
 
+  const pendingRequests = useRef(0);
+  const requestQueue = useRef(Promise.resolve());
+  const optimisticItemsRef = useRef<any[]>([]);
+
+  useEffect(() => {
+    // Sinkronkan ref ini dengan state asli jika tidak ada request yang pending
+    if (pendingRequests.current === 0) {
+      optimisticItemsRef.current = items;
+    }
+  }, [items]);
+
+  const [paymentNotif, setPaymentNotif] = useState<string | null>(null);
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  const [notifHistory, setNotifHistory] = useState<
+    { id: number; message: string; time: Date }[]
+  >(() => {
+    const saved = sessionStorage.getItem(`notif_${roomId}`);
+    if (saved) {
+      return JSON.parse(saved).map((n: any) => ({
+        ...n,
+        time: new Date(n.time),
+      }));
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem(`notif_${roomId}`, JSON.stringify(notifHistory));
+  }, [notifHistory, roomId]);
+
   const [showNameModal, setShowNameModal] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
 
@@ -141,7 +170,7 @@ export const RoomDetail: React.FC<{
   };
 
   const myIdentity = getMyIdentity();
-  const myClientId = myIdentity.id;
+  const myClientId = String(myIdentity.id);
 
   const triggerError = (msg: string) => {
     setError(msg);
@@ -154,6 +183,12 @@ export const RoomDetail: React.FC<{
       if (!res.ok) throw new Error(); // Tambahkan ini agar masuk ke catch jika 404
 
       const data = await res.json();
+      
+      // JANGAN timpa state jika user sedang ngeklik (mencegah balapan data server vs UI lokal)
+      if (pendingRequests.current > 0) {
+        return;
+      }
+
       setRoom(data);
       setItems(data.items || []);
 
@@ -175,11 +210,36 @@ export const RoomDetail: React.FC<{
     if (roomId) {
       fetchRoomData();
       socket.emit("joinRoom", roomId);
+
       socket.on("updateData", () => {
+        // Abaikan socket event jika kita masih ada request yang tertunda
+        // Ini menghindari UI terset-ulang saat kita lagi klik-klik cepat
+        if (pendingRequests.current > 0) {
+          return;
+        }
+
         fetchRoomData();
       });
+
+      socket.on("paymentNotification", (data: { participantName: string }) => {
+        setPaymentNotif(data.participantName);
+
+        setNotifHistory((prev) => [
+          {
+            id: Date.now(),
+            message: `${data.participantName} baru saja melunasi tagihannya.`,
+            time: new Date(),
+          },
+          ...prev,
+        ]);
+
+        setTimeout(() => setPaymentNotif(null), 4000);
+      });
+
       return () => {
+        socket.emit("leaveRoom", roomId);
         socket.off("updateData");
+        socket.off("paymentNotification");
       };
     }
   }, [roomId]);
@@ -188,28 +248,88 @@ export const RoomDetail: React.FC<{
     participants.find((p) => p.id === myClientId)?.is_paid || false;
 
   const updateClaim = async (itemId: string, delta: number) => {
-    if (amIPaid || room?.is_closed) return;
-    const item = items.find((it) => it.id === itemId);
+    // Gunakan optimisticItemsRef.current agar state tetap valid walau diklik beruntun
+    const currentItems = optimisticItemsRef.current.length > 0 ? optimisticItemsRef.current : items;
+    const item = currentItems.find((it) => it.id === itemId);
+
+    if (!item) return;
+
+    const claimsObj = item.claims || {};
+
+    const paidQty = Object.entries(claimsObj).reduce((acc, [uid, qty]) => {
+      const participant = participants.find(
+        (p) => String(p.id) === String(uid),
+      );
+
+      return participant?.is_paid ? acc + (qty as number) : acc;
+    }, 0);
+
+    const isFullyPaid = room?.is_closed && paidQty >= item.total_quantity;
+
+    if (isFullyPaid) return;
+
     const currentClaims = item.claims || {};
     const newQty = (currentClaims[myClientId] || 0) + delta;
     if (newQty < 0) return;
 
-    const totalLainnya = Object.entries(currentClaims)
-      .filter(([id]) => id !== myClientId)
-      .reduce((acc, [_, qty]) => acc + (qty as number), 0);
-    if (totalLainnya + newQty > item.total_quantity) {
+    let totalUsed = 0;
+
+    if (room?.is_closed) {
+      // Setelah room ditutup -> hanya hitung yang SUDAH bayar
+      totalUsed = Object.entries(currentClaims).reduce((acc, [uid, qty]) => {
+        if (uid === myClientId) return acc;
+
+        const participant = participants.find(
+          (p) => String(p.id) === String(uid),
+        );
+
+        return participant?.is_paid ? acc + (qty as number) : acc;
+      }, 0);
+    } else {
+      // Sebelum room ditutup -> semua claim dihitung
+      totalUsed = Object.entries(currentClaims)
+        .filter(([id]) => id !== myClientId)
+        .reduce((acc, [_, qty]) => acc + (qty as number), 0);
+    }
+
+    if (totalUsed + newQty > item.total_quantity) {
       triggerError(`Stok ${item.name} sudah habis!`);
       return;
     }
 
     const newClaims = { ...currentClaims, [myClientId]: newQty };
-    setItems(
-      items.map((it) => (it.id === itemId ? { ...it, claims: newClaims } : it)),
+    
+    // Update ref langsung untuk klik berikutnya yang sangat cepat
+    optimisticItemsRef.current = currentItems.map((it) => 
+      it.id === itemId ? { ...it, claims: newClaims } : it
     );
-    await fetch(`http://localhost:5000/api/rooms/${roomId}/items/${itemId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ claims: newClaims }),
+    
+    setItems(optimisticItemsRef.current);
+
+    pendingRequests.current += 1;
+
+    // Masukkan fetch ke dalam antrian agar request tidak balapan (race condition) di network/backend
+    requestQueue.current = requestQueue.current.then(async () => {
+      try {
+        // Ambil claims paling up-to-date di momen fetch ini berjalan
+        const latestItem = optimisticItemsRef.current.find(it => it.id === itemId);
+        if (latestItem) {
+          await fetch(`http://localhost:5000/api/rooms/${roomId}/items/${itemId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ claims: latestItem.claims }),
+          });
+        }
+      } finally {
+        // Beri jeda 500ms agar database Neon benar-benar selesai commit dan sinkron
+        // sebelum kita membolehkan fetch data baru. Ini mencegah UI "flicker" membaca data kadaluarsa.
+        setTimeout(() => {
+          pendingRequests.current -= 1;
+          if (pendingRequests.current === 0) {
+            fetchRoomData();
+          }
+        }, 500);
+      }
     });
   };
 
@@ -298,9 +418,66 @@ export const RoomDetail: React.FC<{
                   <Lock className="w-4 h-4" />
                 </button>
               )}
-              <button className="hover:text-slate-700 transition-colors">
-                <Bell className="w-5 h-5" />
-              </button>
+
+              {/* --- TOMBOL LONCENG DAN DROPDOWN NOTIFIKASI --- */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowNotifications(!showNotifications)}
+                  className={`p-2 rounded-full transition-all relative ${showNotifications ? "bg-indigo-50 text-[#4f46e5]" : "hover:text-slate-700 hover:bg-slate-50"}`}>
+                  <Bell className="w-5 h-5" />
+                  {/* Indikator Titik Merah jika ada notifikasi */}
+                  {notifHistory.length > 0 && (
+                    <span className="absolute top-1.5 right-2 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+                  )}
+                </button>
+
+                {/* Panel Dropdown Notifikasi */}
+                {showNotifications && (
+                  <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.1)] border border-slate-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                      <h3 className="font-bold text-sm text-slate-800">
+                        Notifikasi
+                      </h3>
+                      <button
+                        onClick={() => setShowNotifications(false)}
+                        className="text-slate-400 hover:text-slate-600">
+                        <X size={14} />
+                      </button>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto">
+                      {notifHistory.length === 0 ? (
+                        <div className="p-8 text-center text-slate-400 text-xs flex flex-col items-center">
+                          <Bell className="w-8 h-8 mb-2 opacity-20" />
+                          Belum ada aktivitas baru.
+                        </div>
+                      ) : (
+                        notifHistory.map((notif) => (
+                          <div
+                            key={notif.id}
+                            className="p-4 border-b border-slate-50 hover:bg-slate-50 transition-colors flex gap-3 items-start">
+                            <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center shrink-0 mt-0.5">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                            </div>
+                            <div>
+                              <p className="text-[11px] font-medium text-slate-700 leading-relaxed">
+                                {notif.message}
+                              </p>
+                              <span className="text-[9px] font-bold text-slate-400 mt-1.5 block">
+                                {notif.time.toLocaleTimeString([], {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </span>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* ----------------------------------------------- */}
+
               <div className="w-8 h-8 rounded-full overflow-hidden border border-slate-200 bg-slate-50">
                 <img
                   src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${myClientId}`}
@@ -311,6 +488,27 @@ export const RoomDetail: React.FC<{
             </div>
           </div>
         </nav>
+
+        {paymentNotif && !room?.is_closed && (
+          <div className="fixed top-20 left-1/2 -translate-x-1/2 w-[90%] max-w-[400px] z-50 pointer-events-none">
+            <div className="flex items-center gap-3 bg-white/95 backdrop-blur-md border border-emerald-100 p-3.5 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] animate-in slide-in-from-top-4 fade-in duration-500">
+              <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div className="flex-1">
+                <p className="text-[12px] font-bold text-slate-800 leading-tight">
+                  Yeay! Ada yang bayar 🎉
+                </p>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  <span className="font-bold text-[#4f46e5]">
+                    {paymentNotif}
+                  </span>{" "}
+                  baru saja melunasi tagihannya.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto pb-32">
@@ -388,29 +586,35 @@ export const RoomDetail: React.FC<{
                 Partisipan ({participants.length})
               </span>
               <div className="flex overflow-x-auto gap-3 pb-2 scrollbar-hide">
-                {participants.map((p) => (
-                  <div
-                    key={p.id}
-                    className="flex flex-col items-center gap-1.5 min-w-[60px]">
-                    <div className="relative">
-                      <img
-                        src={
-                          p.avatar ||
-                          `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`
-                        }
-                        className={`w-12 h-12 rounded-full border-2 object-cover ${p.is_paid ? "border-green-400" : "border-slate-200"}`}
-                      />
-                      {p.is_paid && (
-                        <div className="absolute -bottom-1 -right-1 bg-green-500 text-white w-5 h-5 rounded-full flex items-center justify-center border-2 border-white">
-                          <CheckCircle2 className="w-3 h-3" />
-                        </div>
-                      )}
+                {participants.map((p) => {
+                  // FIX: Gunakan String untuk mencocokkan ID agar aman dari perbedaan tipe data (Number vs String)
+                  const isMe = String(p.id) === myClientId;
+
+                  return (
+                    <div
+                      key={p.id}
+                      className="flex flex-col items-center gap-1.5 min-w-[60px]">
+                      <div className="relative">
+                        <img
+                          src={
+                            p.avatar ||
+                            `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`
+                          }
+                          className={`w-12 h-12 rounded-full border-2 object-cover ${p.is_paid ? "border-green-400" : "border-slate-200"}`}
+                        />
+                        {p.is_paid && (
+                          <div className="absolute -bottom-1 -right-1 bg-green-500 text-white w-5 h-5 rounded-full flex items-center justify-center border-2 border-white">
+                            <CheckCircle2 className="w-3 h-3" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-[10px] font-bold text-slate-700 truncate w-full text-center">
+                        {/* Menggunakan variabel isMe yang sudah diperbaiki */}
+                        {isMe ? "Kamu" : p.name.split(" ")[0]}
+                      </div>
                     </div>
-                    <div className="text-[10px] font-bold text-slate-700 truncate w-full text-center">
-                      {p.id === myClientId ? "Kamu" : p.name.split(" ")[0]}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -431,6 +635,20 @@ export const RoomDetail: React.FC<{
                   const claimers = Object.entries(claimsObj).filter(
                     ([_, qty]) => (qty as number) > 0,
                   );
+
+                  const paidQty = Object.entries(claimsObj).reduce(
+                    (acc, [uid, qty]) => {
+                      const participant = participants.find(
+                        (p) => String(p.id) === String(uid),
+                      );
+
+                      return participant?.is_paid ? acc + (qty as number) : acc;
+                    },
+                    0,
+                  );
+
+                  const isFullyPaid =
+                    room?.is_closed && paidQty >= item.total_quantity;
 
                   return (
                     <div
@@ -460,13 +678,15 @@ export const RoomDetail: React.FC<{
                             <div className="flex flex-wrap gap-1.5">
                               {claimers.map(([uid, qty]) => {
                                 const p = participants.find(
-                                  (part) => part.id === uid,
+                                  (part) => String(part.id) === uid,
                                 );
+                                const isMe = uid === myClientId;
+
                                 return (
                                   <span
                                     key={uid}
                                     className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${p?.is_paid ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600"}`}>
-                                    {uid === myClientId
+                                    {isMe
                                       ? "Kamu"
                                       : p?.name.split(" ")[0] || "Guest"}{" "}
                                     ({qty as number})
@@ -483,33 +703,36 @@ export const RoomDetail: React.FC<{
 
                         {/* Controls */}
                         <div className="shrink-0 ml-3">
-                          {myQty > 0 ? (
+                          {isFullyPaid ? (
+                            // ROOM CLOSED + SEMUA ITEM SUDAH DIBAYAR
+                            <div className="flex items-center justify-center bg-slate-50 rounded-full py-1.5 px-4 border border-slate-200">
+                              <span className="text-[13px] font-bold text-slate-800">
+                                {myQty}
+                              </span>
+                            </div>
+                          ) : (
+                            // SELAMA BELUM FULLY PAID -> tombol tetap ada
                             <div className="flex items-center gap-2 bg-slate-50 rounded-full p-1 border border-slate-200">
                               <button
                                 onClick={() => updateClaim(item.id, -1)}
-                                disabled={amIPaid || room.is_closed}
+                                disabled={room?.is_closed && myQty === 0}
                                 className="w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-sm text-slate-600 hover:text-red-500 disabled:opacity-50">
                                 <Minus className="w-3 h-3" />
                               </button>
+
                               <span className="text-[13px] font-bold text-slate-800 w-4 text-center">
                                 {myQty}
                               </span>
+
                               <button
                                 onClick={() => updateClaim(item.id, 1)}
                                 disabled={
-                                  sisa === 0 || amIPaid || room.is_closed
+                                  room?.is_closed && sisa > 0 ? false : false
                                 }
                                 className="w-6 h-6 bg-[#4f46e5] rounded-full flex items-center justify-center shadow-sm text-white hover:bg-indigo-700 disabled:opacity-50">
                                 <Plus className="w-3 h-3" />
                               </button>
                             </div>
-                          ) : (
-                            <button
-                              onClick={() => updateClaim(item.id, 1)}
-                              disabled={sisa === 0 || amIPaid || room.is_closed}
-                              className="px-4 py-1.5 rounded-full border border-[#4f46e5] text-[#4f46e5] text-[11px] font-bold hover:bg-indigo-50 disabled:opacity-50 disabled:border-slate-300 disabled:text-slate-400">
-                              + Klaim
-                            </button>
                           )}
                         </div>
                       </div>
@@ -521,7 +744,7 @@ export const RoomDetail: React.FC<{
 
             {/* Rincian Pesanan Saya (Sebelum Bottom Bar) */}
             {myClaimedItems.length > 0 && (
-              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm mb-8">
                 <div className="flex items-center gap-2 mb-4 text-slate-900">
                   <ShoppingBag className="w-4 h-4 text-[#4f46e5]" />
                   <h3 className="font-bold text-sm">Rincian Tagihanmu</h3>
@@ -623,16 +846,17 @@ export const RoomDetail: React.FC<{
               </div>
             )}
           </div>
-
           <button
             onClick={handlePayClick}
             disabled={myClaimedItems.length === 0}
             className={`w-full font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 text-sm shadow-md ${
-              amIPaid
+              amIPaid && room?.is_closed
                 ? "bg-slate-100 text-slate-500 shadow-none border border-slate-200"
                 : "bg-[#4f46e5] hover:bg-indigo-700 text-white active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100"
             }`}>
-            {amIPaid ? "LIHAT BUKTI BAYAR" : "Konfirmasi & Bayar"}
+            {amIPaid && room?.is_closed
+              ? "LIHAT BUKTI BAYAR"
+              : "Konfirmasi & Bayar"}
           </button>
         </div>
       </div>

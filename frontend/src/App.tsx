@@ -18,10 +18,12 @@ import {
   X,
   LogIn,
   LogOut,
+  Clock,
 } from "lucide-react";
 import { CreateRoom } from "./components/CreateRoom";
 import { RoomDetail } from "./components/RoomDetail";
 import { Auth } from "./components/Auth";
+import { HistoryRoom } from "./components/HistoryRoom";
 
 // --- KOMPONEN MODAL POP-UP (LOGIN) ---
 const AuthModal = ({
@@ -76,11 +78,13 @@ const AuthModal = ({
 
 export default function App() {
   const [view, setView] = useState<
-    "landing" | "create-room" | "room-detail" | "auth" | "payment"
-  >("landing");
+    "landing" | "create-room" | "room-detail" | "auth" | "payment" | "history"
+  >((sessionStorage.getItem("app_view") as any) || "landing");
 
   // State baru untuk integrasi backend
-  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(
+    sessionStorage.getItem("app_room_id") || null,
+  );
   const [roomCode, setRoomCode] = useState("");
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState<string | null>(null); // State baru untuk error
@@ -88,6 +92,15 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
 
   // Load user data dari localStorage
+  useEffect(() => {
+    sessionStorage.setItem("app_view", view);
+    if (selectedRoomId) {
+      sessionStorage.setItem("app_room_id", selectedRoomId);
+    } else {
+      sessionStorage.removeItem("app_room_id");
+    }
+  }, [view, selectedRoomId]);
+
   useEffect(() => {
     const savedUser = localStorage.getItem("user");
     if (savedUser) setUser(JSON.parse(savedUser));
@@ -130,12 +143,17 @@ export default function App() {
     }
   };
 
+  const handleBackToLanding = () => {
+    setSelectedRoomId(null);
+    setView("landing");
+  };
+
   // Logika Perpindahan Halaman (Fungsi Asli Tetap Sama)
   if (view === "room-detail" && selectedRoomId) {
     return (
       <RoomDetail
         roomId={selectedRoomId}
-        onBack={() => setView("landing")}
+        onBack={handleBackToLanding} // <- Ubah di sini
         onPay={() => setView("payment")}
       />
     );
@@ -150,7 +168,7 @@ export default function App() {
   if (view === "create-room") {
     return (
       <CreateRoom
-        onBack={() => setView("landing")}
+        onBack={handleBackToLanding}
         onCreate={(id: string) => {
           setSelectedRoomId(id);
           setView("room-detail");
@@ -159,8 +177,21 @@ export default function App() {
     );
   }
 
+  if (view === "history" && user) {
+    return (
+      <HistoryRoom
+        userId={user.id}
+        onBack={handleBackToLanding}
+        onSelectRoom={(id) => {
+          setSelectedRoomId(id);
+          setView("room-detail");
+        }}
+      />
+    );
+  }
+
   if (view === "auth") {
-    return <Auth onBack={() => setView("landing")} />;
+    return <Auth onBack={handleBackToLanding} />;
   }
 
   // =========================================================================
@@ -267,6 +298,15 @@ export default function App() {
             className="w-full bg-[#4f46e5] text-white rounded-xl font-bold py-4 text-sm flex items-center justify-center gap-2 shadow-md hover:bg-indigo-700 transition-colors">
             Create Room <ArrowRight className="w-4 h-4" />
           </button>
+
+          {/* TOMBOL HISTORY: Hanya muncul jika user login */}
+          {user && (
+            <button
+              onClick={() => setView("history")}
+              className="w-full mt-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold py-3.5 text-sm flex items-center justify-center gap-2 hover:bg-slate-50 transition-all shadow-sm">
+              <Clock className="w-4 h-4" /> Lihat Riwayat Ruangan
+            </button>
+          )}
 
           <div className="mt-10 w-full max-w-[280px]">
             <HeroIllustration />

@@ -8,6 +8,9 @@ import {
   Trash2,
   Info,
   AlertCircle,
+  Pencil,
+  Camera,
+  Image as ImageIcon,
 } from "lucide-react";
 
 interface Item {
@@ -31,7 +34,8 @@ export const CreateRoom: React.FC<{
   const [success, setSuccess] = useState<string | null>(null); // State sukses
 
   const [isExtracting, setIsExtracting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null); // <-- Ref untuk kamera
+  const galleryInputRef = useRef<HTMLInputElement>(null); // <-- Ref untuk galeri
 
   // Fungsi untuk kirim foto ke Backend
   const handleUploadStruk = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -68,12 +72,14 @@ export const CreateRoom: React.FC<{
       setError("Gagal mengekstrak struk. Coba lagi nanti.");
     } finally {
       setIsExtracting(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (cameraInputRef.current) cameraInputRef.current.value = ""; // Reset input kamera
+      if (galleryInputRef.current) galleryInputRef.current.value = ""; // Reset input galeri
     }
   };
 
   // --- STATE UNTUK MODAL TAMBAH ITEM ---
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingItemId, setEditingItemId] = useState<number | null>(null);
   const [newItemName, setNewItemName] = useState("");
   const [newItemPrice, setNewItemPrice] = useState<string>("");
   const [newItemQty, setNewItemQty] = useState<number>(1);
@@ -87,6 +93,15 @@ export const CreateRoom: React.FC<{
 
   const formatRp = (amount: number) => `Rp ${amount.toLocaleString("id-ID")}`;
 
+  const handleEditClick = (item: Item) => {
+    setEditingItemId(item.id);
+    setNewItemName(item.name);
+    setNewItemPrice(item.price.toString());
+    setNewItemQty(item.quantity);
+    setError(null);
+    setIsModalOpen(true);
+  };
+
   // --- FUNGSI SIMPAN ITEM DARI MODAL ---
   const handleAddItem = () => {
     if (!newItemName || !newItemPrice) {
@@ -94,18 +109,38 @@ export const CreateRoom: React.FC<{
       return;
     }
 
-    const newItem: Item = {
-      id: Date.now(),
-      name: newItemName,
-      price: parseInt(newItemPrice.replace(/\D/g, "")),
-      quantity: newItemQty,
-    };
+    const parsedPrice = parseInt(String(newItemPrice).replace(/\D/g, ""));
 
-    setItems([...items, newItem]);
+    if (editingItemId !== null) {
+      // Logika untuk EDIT item
+      setItems(
+        items.map((item) =>
+          item.id === editingItemId
+            ? {
+                ...item,
+                name: newItemName,
+                price: parsedPrice,
+                quantity: newItemQty,
+              }
+            : item,
+        ),
+      );
+    } else {
+      // Logika untuk TAMBAH item baru
+      const newItem: Item = {
+        id: Date.now(),
+        name: newItemName,
+        price: parsedPrice,
+        quantity: newItemQty,
+      };
+      setItems([...items, newItem]);
+    }
+
     // Reset & Close Modal
     setNewItemName("");
     setNewItemPrice("");
     setNewItemQty(1);
+    setEditingItemId(null);
     setError(null);
     setIsModalOpen(false);
   };
@@ -163,15 +198,19 @@ export const CreateRoom: React.FC<{
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <div
               className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
-              onClick={() => setIsModalOpen(false)}></div>
+              onClick={() => {
+                setIsModalOpen(false);
+                setEditingItemId(null);
+              }}></div>
             <div className="relative bg-white w-full max-w-[360px] rounded-[2rem] p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
               <div className="text-center mb-6">
                 <h2 className="text-xl font-bold text-slate-900 mb-1.5">
-                  Tambah Item
+                  {editingItemId !== null ? "Edit Item" : "Tambah Item"}{" "}
                 </h2>
                 <p className="text-slate-500 text-[11px] px-2 leading-relaxed">
-                  Tambahkan item yang tidak terbaca oleh sistem atau input
-                  secara manual.
+                  {editingItemId !== null
+                    ? "Perbarui nama, harga, atau jumlah item pesanan."
+                    : "Tambahkan item yang tidak terbaca oleh sistem atau input secara manual."}
                 </p>
               </div>
 
@@ -236,10 +275,16 @@ export const CreateRoom: React.FC<{
                   <button
                     onClick={handleAddItem}
                     className="w-full bg-[#4f46e5] text-white py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-sm hover:bg-indigo-700 active:scale-95 transition-all">
-                    <Plus size={16} /> Simpan Item
+                    <Plus size={16} />{" "}
+                    {editingItemId !== null
+                      ? "Simpan Perubahan"
+                      : "Simpan Item"}
                   </button>
                   <button
-                    onClick={() => setIsModalOpen(false)}
+                    onClick={() => {
+                      setIsModalOpen(false);
+                      setEditingItemId(null);
+                    }}
                     className="w-full py-3 text-slate-400 font-semibold text-xs hover:text-slate-600 transition-colors">
                     Batal
                   </button>
@@ -297,35 +342,72 @@ export const CreateRoom: React.FC<{
             {/* Unggah Struk Section */}
             <div>
               <label className="block text-[13px] font-semibold text-slate-700 mb-2.5">
-                Unggah Struk (Otomatis deteksi menu)
+                Scan Struk (Otomatis deteksi menu AI)
               </label>
 
-              {/* Input File Tersembunyi */}
+              {/* Input File Tersembunyi (Satu untuk Kamera, Satu untuk Galeri) */}
               <input
                 type="file"
                 accept="image/*"
-                ref={fileInputRef}
+                capture="environment" // <-- INI KUNCI UNTUK LANGSUNG BUKA KAMERA BELAKANG
+                ref={cameraInputRef}
+                onChange={handleUploadStruk}
+                className="hidden"
+              />
+              <input
+                type="file"
+                accept="image/*"
+                ref={galleryInputRef}
                 onChange={handleUploadStruk}
                 className="hidden"
               />
 
               <div
-                onClick={() => !isExtracting && fileInputRef.current?.click()}
-                className={`border-2 border-dashed border-[#d1d5db] rounded-2xl p-8 flex flex-col items-center justify-center gap-3 bg-[#fafafa] hover:bg-slate-50 transition-colors cursor-pointer ${isExtracting ? "opacity-60 cursor-not-allowed" : ""}`}>
-                <Receipt className="w-8 h-8 text-slate-500" strokeWidth={1.5} />
-                <p className="text-[13px] font-medium text-slate-500 text-center">
-                  {isExtracting
-                    ? "Sedang mengekstrak teks dengan AI..."
-                    : "Klik untuk memilih foto struk dari galeri/komputer"}
-                </p>
-                <button
-                  disabled={isExtracting}
-                  className="mt-2 bg-[#eef2ff] text-[#4f46e5] hover:bg-indigo-100 transition-colors px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2">
-                  <Wand2
-                    className={`w-4 h-4 ${isExtracting ? "animate-spin" : ""}`}
-                  />
-                  {isExtracting ? "Membaca..." : "Ekstrak Item"}
-                </button>
+                className={`border-2 border-dashed border-[#d1d5db] rounded-2xl p-5 bg-[#fafafa] transition-all ${isExtracting ? "border-[#4f46e5] bg-indigo-50/50" : ""}`}>
+                {isExtracting ? (
+                  <div className="flex flex-col items-center justify-center gap-3 py-6">
+                    <Wand2
+                      className="w-8 h-8 text-[#4f46e5] animate-spin"
+                      strokeWidth={1.5}
+                    />
+                    <div className="text-center">
+                      <p className="text-[13px] font-bold text-[#4f46e5]">
+                        Sedang Membaca Struk...
+                      </p>
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        AI sedang mengekstrak nama dan harga menu.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex gap-3 w-full mb-4">
+                      {/* Tombol Buka Kamera */}
+                      <button
+                        onClick={() => cameraInputRef.current?.click()}
+                        className="flex-1 bg-white border border-slate-200 rounded-xl py-4 flex flex-col items-center gap-2 hover:border-[#4f46e5] hover:text-[#4f46e5] text-slate-600 transition-all shadow-sm active:scale-95">
+                        <Camera className="w-7 h-7" strokeWidth={1.5} />
+                        <span className="text-xs font-bold">Ambil Foto</span>
+                      </button>
+
+                      {/* Tombol Buka Galeri */}
+                      <button
+                        onClick={() => galleryInputRef.current?.click()}
+                        className="flex-1 bg-white border border-slate-200 rounded-xl py-4 flex flex-col items-center gap-2 hover:border-[#4f46e5] hover:text-[#4f46e5] text-slate-600 transition-all shadow-sm active:scale-95">
+                        <ImageIcon className="w-7 h-7" strokeWidth={1.5} />
+                        <span className="text-xs font-bold">Dari Galeri</span>
+                      </button>
+                    </div>
+                    <div className="bg-slate-100 rounded-lg p-2.5 flex items-start gap-2">
+                      <Info className="w-4 h-4 text-slate-400 shrink-0" />
+                      <p className="text-[10px] text-slate-500 leading-relaxed">
+                        Pastikan foto struk berada di tempat terang, tidak
+                        buram, dan teks terbaca jelas agar AI dapat bekerja
+                        maksimal.
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -361,15 +443,27 @@ export const CreateRoom: React.FC<{
                         {item.quantity}x {formatRp(item.price)}
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-[13px] font-black text-slate-900">
+                    {/* --- UPDATE BAGIAN BUTTONS INI --- */}
+                    <div className="flex items-center gap-1.5">
+                      <div className="text-[13px] font-black text-slate-900 mr-2">
                         {formatRp(item.price * item.quantity)}
                       </div>
+
+                      {/* Tombol Edit */}
+                      <button
+                        onClick={() => handleEditClick(item)}
+                        className="text-amber-500 hover:text-amber-600 bg-amber-50 p-1.5 rounded-md transition-colors"
+                        title="Edit Item">
+                        <Pencil size={14} />
+                      </button>
+
+                      {/* Tombol Hapus */}
                       <button
                         onClick={() =>
                           setItems(items.filter((it) => it.id !== item.id))
                         }
-                        className="text-red-400 hover:text-red-600 bg-red-50 p-1.5 rounded-md transition-colors">
+                        className="text-red-400 hover:text-red-600 bg-red-50 p-1.5 rounded-md transition-colors"
+                        title="Hapus Item">
                         <Trash2 size={14} />
                       </button>
                     </div>
