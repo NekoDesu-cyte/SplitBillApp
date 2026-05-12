@@ -17,17 +17,15 @@ const app = express();
 const httpServer = createServer(app);
 
 let visionClient;
-try {
-  if (process.env.GCP_SA_KEY) {
+if (process.env.GCP_SA_KEY) {
+  try {
     visionClient = new vision.ImageAnnotatorClient({
       credentials: JSON.parse(process.env.GCP_SA_KEY)
     });
     console.log("✅ Vision Client initialized");
-  } else {
-    console.error("❌ GCP_SA_KEY is missing in environment variables");
+  } catch (e) {
+    console.error("❌ Gagal parse GCP_SA_KEY:", e.message);
   }
-} catch (error) {
-  console.error("❌ Failed to parse GCP_SA_KEY:", error.message);
 }
 
 function cleanPrice(priceStr) {
@@ -37,18 +35,18 @@ function cleanPrice(priceStr) {
 
 function parseReceipt(textAnnotations) {
   if (!textAnnotations || textAnnotations.length === 0) return [];
-  
+
   const fullText = textAnnotations[0].description;
   const lines = fullText.split('\n').map(line => line.trim()).filter(line => line);
-  
+
   const items = [];
   const seenIdentifiers = new Set();
-  
+
   // Kata-kata yang mengindikasikan baris tersebut BUKAN nama menu makanan/minuman
   const ignoreLineKeywords = [
-    'subtotal', 'sub tot', 'total', 'bayar', 'cash', 'kembali', 'change', 
-    'pajak', 'tax', 'ppn', 'diskon', 'discount', 'kembalian', 'tunai', 
-    'debit', 'kredit', 'bca', 'mandiri', 'qris', 'gopay', 'ovo', 'dana', 
+    'subtotal', 'sub tot', 'total', 'bayar', 'cash', 'kembali', 'change',
+    'pajak', 'tax', 'ppn', 'diskon', 'discount', 'kembalian', 'tunai',
+    'debit', 'kredit', 'bca', 'mandiri', 'qris', 'gopay', 'ovo', 'dana',
     'shopeepay', 'jl.', 'jalan', 'telp', 'tanggal', 'waktu', 'struk', 'kasir',
     'admin', 'service', 'pos1', 'check no', 'www.'
   ];
@@ -58,7 +56,7 @@ function parseReceipt(textAnnotations) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const lineLower = line.toLowerCase();
-    
+
     // Lewati baris jika merupakan baris ringkasan akhir/header struk tertentu
     // Tapi JANGAN di-break agar tetap bisa membaca menu di baris lain di bawahnya
     const isSummaryLine = ['subtotal', 'sub tot', 'total bayar', 'total item', 'cash', 'kembali', 'change'].some(w => lineLower.includes(w));
@@ -117,7 +115,7 @@ function parseReceipt(textAnnotations) {
       if (finalLetterCount >= 3 && !isForbiddenWord) {
         // Format Title Case
         const titleCaseName = finalName.replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
-        
+
         // Hindari duplikasi item yang sama persis
         const identifier = `${titleCaseName.toLowerCase()}-${unitPrice}`;
         if (!seenIdentifiers.has(identifier)) {
@@ -153,7 +151,7 @@ app.use(express.json());
 const sql = neon(process.env.DATABASE_URL);
 
 // Konfigurasi folder penampung foto sementara
-const upload = multer({ dest: "uploads/" });
+const upload = multer({ dest: "/tmp/uploads/" });
 
 // --- AUTH API ---
 app.post("/api/auth/register", async (req, res) => {
@@ -194,13 +192,13 @@ app.post("/api/ocr", upload.single("receipt"), async (req, res) => {
   try {
     const [result] = await visionClient.textDetection(imagePath);
     const textAnnotations = result.textAnnotations;
-    
+
     const items = parseReceipt(textAnnotations);
-    
+
     if (fs.existsSync(imagePath)) {
       fs.unlinkSync(imagePath);
     }
-    
+
     res.json({ items });
   } catch (error) {
     console.error("OCR Error:", error);
@@ -247,7 +245,7 @@ app.post("/api/rooms/:roomId/join", async (req, res) => {
       VALUES (${clientId}, ${req.params.roomId}, ${participantName}, ${defaultAvatar}, 'GUEST')
       ON CONFLICT (id, room_id) DO NOTHING
     `;
-    
+
     io.to(req.params.roomId).emit("updateData");
     res.json({ success: true });
   } catch (e) {
@@ -290,7 +288,7 @@ app.get("/api/rooms/:id", async (req, res) => {
           }
         }
       }
-      
+
       await sql`UPDATE rooms SET last_activity_at = CURRENT_TIMESTAMP WHERE id = ${room.id}`;
       let [updatedRoom] = await sql`
         SELECT *, 
@@ -298,19 +296,19 @@ app.get("/api/rooms/:id", async (req, res) => {
         FROM rooms WHERE id = ${req.params.id}
       `;
       room = updatedRoom;
-      
+
       if (anyChanged) {
-         io.to(req.params.id).emit("updateData");
+        io.to(req.params.id).emit("updateData");
       }
     }
 
     const items = await sql`SELECT * FROM items WHERE room_id = ${req.params.id} ORDER BY name ASC`;
     const participants = await sql`SELECT * FROM participants WHERE room_id = ${req.params.id}`;
-    
+
     // Kirim sisa waktu ke frontend
     const currentDiff = Number(room.seconds_since_active);
     const remainingSeconds = Math.max(0, 3600 - currentDiff);
-    
+
     res.json({ ...room, items, participants, remainingSeconds });
   } catch (error) {
     console.error("Error GET room:", error);
@@ -435,13 +433,13 @@ io.on("connection", (socket) => {
     socket.join(roomId);
     socket.roomId = roomId;
     socket.clientId = clientId;
-    
+
     if (!roomOnlineUsers[roomId]) {
       roomOnlineUsers[roomId] = new Set();
     }
     roomOnlineUsers[roomId].add(clientId);
     io.to(roomId).emit("onlineUsers", Array.from(roomOnlineUsers[roomId]));
-    
+
     console.log(`🏠 User ${clientId} bergabung ke Room: ${roomId}`);
   });
 
@@ -462,7 +460,7 @@ io.on("connection", (socket) => {
     console.log("❌ User disconnected:", socket.id);
   });
 });
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server Ready on port ${PORT}`);
 });
