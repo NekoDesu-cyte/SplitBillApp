@@ -93,8 +93,6 @@ jobs:
               yaml.dump(data, f, default_flow_style=False, allow_unicode=True)
           print("env.yaml generated successfully")
           PYEOF
-          print("env.yaml generated successfully")
-          PYEOF
 
       - name: Deploy to Cloud Run
         run: |
