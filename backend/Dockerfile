@@ -1,23 +1,20 @@
-FROM node:20-alpine
+# Use Debian-slim (NOT Alpine) — required for @google-cloud/vision native modules
+FROM node:20-slim
 
 WORKDIR /usr/src/app
 
-# Salin package files
+# Salin package files dulu untuk cache layer
 COPY package*.json ./
 
-# Gunakan npm install jika npm ci bermasalah dengan package-lock yang tidak update
-RUN npm install --only=production
+# Install production dependencies
+RUN npm install --omit=dev
 
-# Salin semua file
+# Salin semua source code
 COPY . .
 
 # Pastikan folder tmp tersedia untuk multer
 RUN mkdir -p /tmp/uploads
 
-# Pastikan tidak ada hardcode ke file JSON di langkah RUN manapun
-# Jika ada langkah build (seperti tsc), pastikan tidak butuh file JSON tersebut
-
 EXPOSE 8080
 
-# Jalankan langsung dengan node untuk melihat error lebih jelas jika start script bermasalah
 CMD [ "node", "server.js" ]
