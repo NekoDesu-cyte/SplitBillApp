@@ -118,8 +118,22 @@ export const RoomDetail: React.FC<{
   };
 
   const getMyIdentity = () => {
+    const activeSubId = localStorage.getItem(`sub_id_${roomId}`);
+    const activeSubName = localStorage.getItem(`sub_name_${roomId}`);
+
     const savedUser = localStorage.getItem("user");
-    if (savedUser) return { ...JSON.parse(savedUser), isGuest: false };
+    if (savedUser) {
+      const u = JSON.parse(savedUser);
+      if (activeSubId) {
+        return { id: activeSubId, name: activeSubName || `${u.name} (Tambahan)`, isGuest: false };
+      }
+      return { ...u, isGuest: false };
+    }
+
+    if (activeSubId) {
+      return { id: activeSubId, name: activeSubName || "Guest (Tambahan)", isGuest: true };
+    }
+
     let guestId =
       localStorage.getItem("splitbill_client_id") ||
       "guest-" + Math.random().toString(36).substring(2, 9);
@@ -213,6 +227,12 @@ export const RoomDetail: React.FC<{
     participants.find((p) => p.id === myClientId)?.is_paid || false;
 
   const updateClaim = async (itemId: string, delta: number) => {
+    // 🔒 BUG FIX #1: Blokir perubahan cart jika user sudah bayar
+    if (amIPaid) {
+      triggerError("Kamu sudah lunas! Pesanan tidak bisa diubah lagi.");
+      return;
+    }
+
     // Gunakan optimisticItemsRef.current agar state tetap valid walau diklik beruntun
     const currentItems = optimisticItemsRef.current.length > 0 ? optimisticItemsRef.current : items;
     const item = currentItems.find((it) => it.id === itemId);
@@ -282,7 +302,7 @@ export const RoomDetail: React.FC<{
           await fetch(`https://splitbill-backend-804441447131.asia-southeast2.run.app/api/rooms/${roomId}/items/${itemId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ claims: latestItem.claims }),
+            body: JSON.stringify({ claims: latestItem.claims, clientId: myClientId }),
           });
         }
       } finally {
@@ -365,6 +385,7 @@ export const RoomDetail: React.FC<{
                 className="p-2 -ml-2 text-slate-400 hover:text-slate-800 hover:bg-slate-50 rounded-full transition-all">
                 <ArrowLeft className="w-5 h-5" />
               </button>
+              <img src="/favicon.svg" alt="Bagi Bayar Logo" className="w-7 h-7 rounded-lg shadow-sm" />
               <span className="font-display font-extrabold text-lg tracking-tight text-[#4f46e5]">
                 BagiBayar
               </span>
@@ -470,7 +491,7 @@ export const RoomDetail: React.FC<{
         )}
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto pb-32">
+        <div className="flex-1 overflow-y-auto pb-40">
           <div className="px-5 py-6">
             {/* Header Ruangan */}
             <div className="mb-6 text-center">
@@ -499,11 +520,10 @@ export const RoomDetail: React.FC<{
                 </div>
                 <div>
                   <h4 className="text-[13px] font-bold text-amber-900 mb-0.5">
-                    ROOM Telah Ditutup
+                    Sesi Pembayaran Terkunci
                   </h4>
                   <p className="text-[11px] text-amber-700 leading-relaxed font-medium">
-                    Host telah menutup ruangan ini. Kamu tidak dapat menambah
-                    atau mengubah klaim pesanan lagi.
+                    Tagihan awal telah lunas/terkunci. Untuk memesan menu ronde berikutnya, gunakan tombol <b>Pesan Menu Tambahan Lagi</b> di bawah.
                   </p>
                 </div>
               </div>
@@ -674,24 +694,22 @@ export const RoomDetail: React.FC<{
                             </div>
                           ) : (
                             // SELAMA BELUM FULLY PAID -> tombol tetap ada
-                            <div className="flex items-center gap-2 bg-slate-50 rounded-full p-1 border border-slate-200">
+                            <div className={`flex items-center gap-2 rounded-full p-1 border ${amIPaid ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-200'}`}>
                               <button
                                 onClick={() => updateClaim(item.id, -1)}
-                                disabled={room?.is_closed && myQty === 0}
-                                className="w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-sm text-slate-600 hover:text-red-500 disabled:opacity-50">
+                                disabled={amIPaid || myQty === 0}
+                                className="w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-sm text-slate-600 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed">
                                 <Minus className="w-3 h-3" />
                               </button>
 
-                              <span className="text-[13px] font-bold text-slate-800 w-4 text-center">
+                              <span className={`text-[13px] font-bold w-4 text-center ${amIPaid ? 'text-green-700' : 'text-slate-800'}`}>
                                 {myQty}
                               </span>
 
                               <button
                                 onClick={() => updateClaim(item.id, 1)}
-                                disabled={
-                                  room?.is_closed && sisa > 0 ? false : false
-                                }
-                                className="w-6 h-6 bg-[#4f46e5] rounded-full flex items-center justify-center shadow-sm text-white hover:bg-indigo-700 disabled:opacity-50">
+                                disabled={amIPaid || sisa === 0}
+                                className="w-6 h-6 bg-[#4f46e5] rounded-full flex items-center justify-center shadow-sm text-white hover:bg-indigo-700 disabled:opacity-30 disabled:cursor-not-allowed disabled:bg-slate-300">
                                 <Plus className="w-3 h-3" />
                               </button>
                             </div>
@@ -810,16 +828,41 @@ export const RoomDetail: React.FC<{
           </div>
           <button
             onClick={handlePayClick}
-            disabled={myClaimedItems.length === 0}
+            disabled={myClaimedItems.length === 0 || amIPaid}
             className={`w-full font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 text-sm shadow-md ${
-              amIPaid && room?.is_closed
-                ? "bg-slate-100 text-slate-500 shadow-none border border-slate-200"
+              amIPaid
+                ? "bg-green-100 text-green-700 shadow-none border border-green-200 cursor-not-allowed"
                 : "bg-[#4f46e5] hover:bg-indigo-700 text-white active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100"
             }`}>
-            {amIPaid && room?.is_closed
-              ? "LIHAT BUKTI BAYAR"
+            {amIPaid
+              ? <><CheckCircle2 className="w-4 h-4" /> SUDAH LUNAS</>
               : "Konfirmasi & Bayar"}
           </button>
+          {amIPaid && (
+            <button
+              onClick={() => {
+                const baseName = myIdentity.name.replace(/\s*\(Tambahan.*\)/g, "");
+                const newSubId = "sub-" + Math.random().toString(36).substring(2, 9);
+                const count = (parseInt(localStorage.getItem(`sub_count_${roomId}`) || "0") || 0) + 1;
+                localStorage.setItem(`sub_count_${roomId}`, String(count));
+                const newSubName = `${baseName} (Tambahan ${count})`;
+                
+                localStorage.setItem(`sub_id_${roomId}`, newSubId);
+                localStorage.setItem(`sub_name_${roomId}`, newSubName);
+                
+                fetch(`https://splitbill-backend-804441447131.asia-southeast2.run.app/api/rooms/${roomId}/join`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ clientId: newSubId, participantName: newSubName })
+                }).then(() => {
+                  window.location.reload();
+                });
+              }}
+              className="w-full mt-2.5 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-[#4f46e5] font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2 text-xs shadow-sm"
+            >
+              <Plus size={16} /> Pesan Menu Tambahan Lagi
+            </button>
+          )}
         </div>
       </div>
     </div>

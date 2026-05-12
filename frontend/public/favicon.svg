@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Premium Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4F46E5" />
+      <stop offset="100%" stop-color="#7C3AED" />
+    </linearGradient>
+    
+    <!-- Soft Drop Shadow for the Receipt -->
+    <filter id="dropShadow" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#000000" flood-opacity="0.3" />
+    </filter>
+
+    <!-- Vibrant Emerald Gradient for Paid Amount -->
+    <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#22C55E" />
+      <stop offset="100%" stop-color="#10B981" />
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded Icon Base (Squircle) -->
+  <rect width="512" height="512" rx="128" fill="url(#bgGrad)" />
+
+  <!-- Receipt Silhouette -->
+  <g filter="url(#dropShadow)">
+    <path d="M 136 130 
+             A 24 24 0 0 1 160 106 
+             L 352 106 
+             A 24 24 0 0 1 376 130 
+             L 376 406 
+             L 346 382 
+             L 316 406 
+             L 286 382 
+             L 256 406 
+             L 226 382 
+             L 196 406 
+             L 166 382 
+             L 136 406 Z" 
+          fill="#FFFFFF" />
+
+    <!-- Receipt Header -->
+    <rect x="186" y="156" width="140" height="22" rx="11" fill="#F1F5F9" />
+    <rect x="186" y="156" width="85" height="22" rx="11" fill="#E2E8F0" />
+    
+    <!-- Receipt Items -->
+    <rect x="186" y="206" width="75" height="16" rx="8" fill="#E2E8F0" />
+    <rect x="296" y="206" width="30" height="16" rx="8" fill="#CBD5E1" />
+
+    <rect x="186" y="240" width="95" height="16" rx="8" fill="#E2E8F0" />
+    <rect x="296" y="240" width="30" height="16" rx="8" fill="#CBD5E1" />
+    
+    <!-- Receipt Total -->
+    <rect x="186" y="334" width="50" height="24" rx="12" fill="#E2E8F0" />
+    <rect x="246" y="334" width="80" height="24" rx="12" fill="url(#greenGrad)" />
+  </g>
+
+  <!-- Dynamic Split Line Overlay -->
+  <!-- A striking vibrant green line cutting across to symbolize 'Bagi' (Splitting) -->
+  <g>
+    <line x1="100" y1="288" x2="412" y2="288" stroke="#22C55E" stroke-width="12" stroke-dasharray="20 14" stroke-linecap="round" />
+    
+    <!-- Left interactive split node -->
+    <circle cx="120" cy="288" r="20" fill="#22C55E" />
+    <circle cx="120" cy="288" r="8" fill="#FFFFFF" />
+    
+    <!-- Right interactive split node -->
+    <circle cx="392" cy="288" r="20" fill="#22C55E" />
+    <circle cx="392" cy="288" r="8" fill="#FFFFFF" />
+  </g>
+</svg>

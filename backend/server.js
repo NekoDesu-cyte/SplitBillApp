@@ -31,124 +31,107 @@ function parseReceipt(textAnnotations) {
   const lines = fullText.split('\n').map(line => line.trim()).filter(line => line);
   
   const items = [];
-  const raw_texts = [];
+  const seenIdentifiers = new Set();
   
-  const stop_words_regex = /^(sub\s*tot|total|bayar|cash|kembali|tunai|change|pajak|tax|ppn|diskon|discount|payment|debit|kredit|bca|mandiri|bri|bni|qris|ovo|gopay|dana|linkaja|shopeepay|admin|service)/i;
-  const ignore_words = ['jl', 'jl.', 'telp', 'tanggal', 'waktu', 'kasir', 'struk', 'pos1', 'check no', 'www.'];
-  
-  for (const text of lines) {
-    const t_lower = text.toLowerCase();
-    if (stop_words_regex.test(t_lower)) {
-        break;
-    }
-    if (text && !ignore_words.some(w => t_lower.includes(w))) {
-      raw_texts.push(text);
-    }
-  }
-  
-  let current_name = null;
-  
-  for (let i = 0; i < raw_texts.length; i++) {
-    const text = raw_texts[i];
-    const text_lower = text.toLowerCase();
+  // Kata-kata yang mengindikasikan baris tersebut BUKAN nama menu makanan/minuman
+  const ignoreLineKeywords = [
+    'subtotal', 'sub tot', 'total', 'bayar', 'cash', 'kembali', 'change', 
+    'pajak', 'tax', 'ppn', 'diskon', 'discount', 'kembalian', 'tunai', 
+    'debit', 'kredit', 'bca', 'mandiri', 'qris', 'gopay', 'ovo', 'dana', 
+    'shopeepay', 'jl.', 'jalan', 'telp', 'tanggal', 'waktu', 'struk', 'kasir',
+    'admin', 'service', 'pos1', 'check no', 'www.'
+  ];
+
+  let lastNameCandidate = null;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineLower = line.toLowerCase();
     
-    const priceRegex = /(?:rp\s*)?(\d{1,3}(?:[.,]\d{3})+)/gi;
-    let prices = [];
+    // Lewati baris jika merupakan baris ringkasan akhir/header struk tertentu
+    // Tapi JANGAN di-break agar tetap bisa membaca menu di baris lain di bawahnya
+    const isSummaryLine = ['subtotal', 'sub tot', 'total bayar', 'total item', 'cash', 'kembali', 'change'].some(w => lineLower.includes(w));
+    if (isSummaryLine) continue;
+
+    // Cari angka yang berpotensi sebagai harga (minimal ratusan/ribuan, bisa pakai titik/koma atau tanpa titik)
+    // Berakhiran 00 atau format ribuan standar
+    const priceRegex = /\b(?:rp\s*)?(\d{1,3}(?:[.,]\d{3})+|\d{3,7}00)\b/gi;
+    let matches = [];
     let match;
-    while ((match = priceRegex.exec(text_lower)) !== null) {
-      prices.push(match[0]);
+    while ((match = priceRegex.exec(lineLower)) !== null) {
+      // Hapus karakter non-digit untuk mendapatkan nilai integer murni
+      const val = parseInt(match[1].replace(/\D/g, ""), 10);
+      if (val >= 500) {
+        matches.push({ text: match[0], value: val });
+      }
     }
-    
-    if (prices.length > 0) {
-      const total_price_str = prices[prices.length - 1];
-      const price_val = cleanPrice(total_price_str);
-      
-      if (price_val < 500) continue;
-      
-      let qty = 1;
-      for (let k = i; k >= Math.max(0, i - 3); k--) {
-        const check_text = raw_texts[k].toLowerCase();
-        
-        const m_full = check_text.match(/\b(\d{1,2})\s*[xX\*]\s*\d{3,}/);
-        const m_end = check_text.match(/[xX\*]\s*(\d{1,2})\b(?!\s*[,.]\d)/);
-        const m_start = check_text.match(/\b(\d{1,2})\s*[xX\*]/);
-        const m_lusin = check_text.match(/\b(\d{1,2})\s+[a-z]+\s+[xX\*]/);
-        const m_front = check_text.match(/^(\d{1,2})\s+[a-z]/);
-        
-        if (m_full) { qty = parseInt(m_full[1], 10); break; }
-        else if (m_lusin) { qty = parseInt(m_lusin[1], 10); break; }
-        else if (m_start) { qty = parseInt(m_start[1], 10); break; }
-        else if (m_end) { qty = parseInt(m_end[1], 10); break; }
-        else if (m_front && k === i) { qty = parseInt(m_front[1], 10); break; }
+
+    // Ekstrak informasi Qty jika ada format seperti "2x", "2 x", "x2"
+    let qty = 1;
+    const qtyMatch = lineLower.match(/\b(\d{1,2})\s*[xX\*]/) || lineLower.match(/[xX\*]\s*(\d{1,2})\b/);
+    if (qtyMatch) {
+      qty = parseInt(qtyMatch[1], 10) || 1;
+    }
+
+    if (matches.length > 0) {
+      // Ambil harga terakhir di baris tersebut sebagai total harga item
+      const itemTotalPrice = matches[matches.length - 1].value;
+      const unitPrice = Math.floor(itemTotalPrice / qty);
+
+      // Bersihkan nama item dari teks harga dan kuantitas
+      let cleanName = line;
+      matches.forEach(m => {
+        cleanName = cleanName.replace(new RegExp(m.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '');
+      });
+      cleanName = cleanName.replace(/\b\d{1,2}\s*[xX\*]\s*\d*/gi, '');
+      cleanName = cleanName.replace(/[xX\*]\s*\d{1,2}\b/gi, '');
+      cleanName = cleanName.replace(/^(?:rp|idr)\b/gi, '');
+      cleanName = cleanName.replace(/^[^a-zA-Z]+/, ''); // Hapus simbol/angka di awal
+      cleanName = cleanName.replace(/[^a-zA-Z0-9)]+$/, ''); // Hapus simbol di akhir
+      cleanName = cleanName.trim();
+
+      let finalName = cleanName;
+
+      // Jika di baris ini tidak tersisa teks nama yang valid (panjang huruf < 3),
+      // kemungkinan besar nama menu ada di baris sebelumnya
+      const letterCount = (cleanName.match(/[a-zA-Z]/g) || []).length;
+      if (letterCount < 3 && lastNameCandidate) {
+        finalName = lastNameCandidate;
       }
-      
-      if (qty === 0) qty = 1;
-      const unit_price = Math.floor(price_val / qty);
-      
-      let name_candidate = text;
-      for (const p of prices) {
-        const escapedP = p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        name_candidate = name_candidate.replace(new RegExp(`(?:rp\\s*)?${escapedP}`, 'ig'), '');
-      }
-      
-      name_candidate = name_candidate.replace(/\b\d{1,2}\s*[xX\*]\s*\d{3,}/ig, '');
-      name_candidate = name_candidate.replace(/[xX\*]\s*\d{1,2}\b(?!\s*[,.]\d)/ig, '');
-      name_candidate = name_candidate.replace(/\b\d{1,2}\s*[xX\*]/ig, '');
-      name_candidate = name_candidate.replace(/\b\d{1,2}\s+[a-z]+\s+[xX\*]/ig, '');
-      name_candidate = name_candidate.replace(/^(\d{1,2})\s+/, '').trim();
-      name_candidate = name_candidate.replace(/[^a-zA-Z0-9]+$/, '').trim();
-      
-      const toTitleCase = (str) => str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
-      
-      if (name_candidate.replace(/[^a-zA-Z]/g, '').length > 2) {
-        items.push({ name: toTitleCase(name_candidate), price: unit_price, quantity: qty });
-        current_name = null;
-      } else {
-        if (current_name) {
-          items.push({ name: toTitleCase(current_name), price: unit_price, quantity: qty });
-          current_name = null;
-        } else {
-          for (let j = i - 1; j >= Math.max(0, i - 5); j--) {
-            let prev_text = raw_texts[j];
-            let clean_prev = prev_text.replace(/^\d+[\.\s]*/, '').trim();
-            clean_prev = clean_prev.replace(/\b\d{1,2}\s*[xX\*]\s*\d{3,}/ig, '');
-            clean_prev = clean_prev.replace(/[xX\*]\s*\d{1,2}\b(?!\s*[,.]\d)/ig, '');
-            clean_prev = clean_prev.replace(/\b\d{1,2}\s*[xX\*]/ig, '');
-            clean_prev = clean_prev.replace(/[^a-zA-Z0-9]+$/, '').trim();
-            
-            if (/[a-zA-Z]{3,}/.test(clean_prev)) {
-              items.push({ name: toTitleCase(clean_prev), price: unit_price, quantity: qty });
-              break;
-            }
-          }
+
+      // Validasi akhir nama menu
+      const finalLetterCount = (finalName.match(/[a-zA-Z]/g) || []).length;
+      const isForbiddenWord = ignoreLineKeywords.some(w => finalName.toLowerCase().includes(w));
+
+      if (finalLetterCount >= 3 && !isForbiddenWord) {
+        // Format Title Case
+        const titleCaseName = finalName.replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+        
+        // Hindari duplikasi item yang sama persis
+        const identifier = `${titleCaseName.toLowerCase()}-${unitPrice}`;
+        if (!seenIdentifiers.has(identifier)) {
+          seenIdentifiers.add(identifier);
+          items.push({
+            name: titleCaseName,
+            price: unitPrice,
+            quantity: qty
+          });
         }
+        // Reset last candidate setelah berhasil digunakan
+        lastNameCandidate = null;
       }
     } else {
-      let clean_text = text.replace(/^\d+[\.\s]*/, '').trim();
-      if (/[a-zA-Z]{3,}/.test(clean_text)) {
-        current_name = clean_text;
+      // Jika baris tidak memiliki harga, simpan sebagai kandidat nama menu untuk baris harga berikutnya
+      // asalkan bukan kata-kata yang harus diabaikan
+      const letterCount = (line.match(/[a-zA-Z]/g) || []).length;
+      const isForbiddenWord = ignoreLineKeywords.some(w => lineLower.includes(w));
+      if (letterCount >= 3 && !isForbiddenWord) {
+        lastNameCandidate = line.trim();
       }
     }
   }
-  
-  const hard_filter_words = ['sub', 'tot', 'bayar', 'cash', 'kembali', 'change', 'pajak', 'tax', 'diskon', 'meja', 'kode'];
-  const unique_items = [];
-  const seen = new Set();
-  
-  for (const item of items) {
-    const name_lower = item.name.toLowerCase();
-    const is_forbidden = hard_filter_words.some(hw => name_lower.includes(hw));
-    
-    if (item.price > 0 && item.name.length > 2 && !is_forbidden) {
-      const identifier = `${item.name.toLowerCase()}-${item.price}`;
-      if (!seen.has(identifier)) {
-        seen.add(identifier);
-        unique_items.push(item);
-      }
-    }
-  }
-  
-  return unique_items;
+
+  return items;
 }
 
 
@@ -333,7 +316,20 @@ app.get("/api/rooms/code/:code", async (req, res) => {
 
 app.patch("/api/rooms/:roomId/items/:itemId", async (req, res) => {
   try {
-    const claimsStr = JSON.stringify(req.body.claims || {});
+    const { claims, clientId } = req.body;
+
+    // 🔒 BUG FIX #6: Blokir update jika user yang request sudah is_paid = true
+    if (clientId) {
+      const [participant] = await sql`
+        SELECT is_paid FROM participants 
+        WHERE id = ${String(clientId)} AND room_id = ${req.params.roomId}
+      `;
+      if (participant?.is_paid) {
+        return res.status(403).json({ error: "Kamu sudah lunas, tidak bisa mengubah pesanan." });
+      }
+    }
+
+    const claimsStr = JSON.stringify(claims || {});
     await sql`UPDATE items SET claims = ${claimsStr}::jsonb WHERE id = ${req.params.itemId}`;
     await sql`UPDATE rooms SET last_activity_at = CURRENT_TIMESTAMP WHERE id = ${req.params.roomId}`;
 
@@ -365,15 +361,13 @@ app.patch("/api/rooms/:roomId/pay", async (req, res) => {
       WHERE room_id = ${req.params.roomId} AND is_paid = FALSE
     `;
 
-    if (unpaidParticipants.length === 0) {
-      // Jika semua sudah lunas, otomatis tutup ruangan
-      await sql`UPDATE rooms SET is_closed = TRUE WHERE id = ${req.params.roomId}`;
-    }
+    // Agar mendukung pesanan menu ronde berikutnya (multironde), kita tidak menutup ruangan secara otomatis.
+    // Host tetap bisa menutup ruangan secara manual melalui tombol Lock di pojok kanan atas.
 
     io.to(req.params.roomId).emit("paymentNotification", { participantName });
 
     io.to(req.params.roomId).emit("updateData");
-    res.json({ success: true, auto_closed: unpaidParticipants.length === 0 });
+    res.json({ success: true, auto_closed: false });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

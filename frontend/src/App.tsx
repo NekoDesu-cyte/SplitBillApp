@@ -305,9 +305,7 @@ export default function App() {
         <nav className="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 w-full">
           <div className="px-5 h-16 flex justify-between items-center">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 bg-[#4f46e5] rounded-lg flex items-center justify-center shadow-sm">
-                <Receipt className="text-white w-4 h-4" />
-              </div>
+              <img src="/favicon.svg" alt="Bagi Bayar Logo" className="w-8 h-8 rounded-lg shadow-sm" />
               <span className="font-display font-extrabold text-lg tracking-tight text-[#4f46e5]">
                 Bagi Bayar
               </span>
@@ -579,9 +577,7 @@ export default function App() {
         <footer className="bg-white border-t border-slate-200 py-8 px-5">
           <div className="flex flex-col items-center gap-4">
             <div className="flex items-center gap-2 opacity-80">
-              <div className="w-6 h-6 bg-[#4f46e5] rounded flex items-center justify-center">
-                <Receipt className="text-white w-3 h-3" />
-              </div>
+              <img src="/favicon.svg" alt="Bagi Bayar Logo" className="w-6 h-6 rounded shadow-sm" />
               <span className="font-display font-bold text-sm tracking-tight text-slate-700">
                 BagiBayar
               </span>

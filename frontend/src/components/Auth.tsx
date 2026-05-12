@@ -97,9 +97,7 @@ export const Auth: React.FC<AuthProps> = ({ onBack }) => {
               <ArrowLeft className="w-6 h-6" />
             </button>
             <div className="flex-1 flex justify-center items-center gap-2">
-              <div className="w-7 h-7 bg-[#4f46e5] rounded-lg flex items-center justify-center shadow-sm">
-                <Receipt className="text-white w-4 h-4" />
-              </div>
+              <img src="/favicon.svg" alt="Bagi Bayar Logo" className="w-7 h-7 rounded-lg shadow-sm" />
               <span className="font-display font-extrabold text-lg tracking-tight text-[#4f46e5]">
                 BagiBayar
               </span>

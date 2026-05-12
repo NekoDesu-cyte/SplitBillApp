@@ -75,9 +75,10 @@ export const Payment: React.FC<{ roomId: string; onBack: () => void }> = ({
 
     const fetchPaymentData = async () => {
       try {
-        let myClientId = localStorage.getItem("splitbill_client_id") || "guest";
+        const activeSubId = localStorage.getItem(`sub_id_${roomId}`);
+        let myClientId = activeSubId || localStorage.getItem("splitbill_client_id") || "guest";
         const savedUser = localStorage.getItem("user");
-        if (savedUser) {
+        if (savedUser && !activeSubId) {
           myClientId = String(JSON.parse(savedUser).id);
         }
         const res = await fetch(`https://splitbill-backend-804441447131.asia-southeast2.run.app/api/rooms/${roomId}`);
@@ -130,13 +131,16 @@ export const Payment: React.FC<{ roomId: string; onBack: () => void }> = ({
     setIsConfirming(true);
     try {
       // --- FIX LOGIKA IDENTITAS ---
-      const savedUser = localStorage.getItem("user");
-      let clientId = localStorage.getItem("splitbill_client_id") || "guest";
-      let participantName =
-        localStorage.getItem(`guest_name_${roomId}`) || "User";
+      const activeSubId = localStorage.getItem(`sub_id_${roomId}`);
+      const activeSubName = localStorage.getItem(`sub_name_${roomId}`);
 
-      // Jika user sudah login (Host), gunakan ID dan Nama aslinya!
-      if (savedUser) {
+      const savedUser = localStorage.getItem("user");
+      let clientId = activeSubId || localStorage.getItem("splitbill_client_id") || "guest";
+      let participantName =
+        activeSubName || localStorage.getItem(`guest_name_${roomId}`) || "User";
+
+      // Jika user sudah login (Host) dan tidak sedang memakai sub-akun
+      if (savedUser && !activeSubId) {
         const user = JSON.parse(savedUser);
         clientId = String(user.id);
         participantName = user.name;
