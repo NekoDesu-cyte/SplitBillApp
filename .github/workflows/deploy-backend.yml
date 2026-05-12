@@ -30,16 +30,11 @@ jobs:
       - name: Deploy Backend Service to Cloud Run
         run: |
           cd backend
-          cat > env.yaml << 'EOF'
-          GCP_SA_KEY: "${{ secrets.GCP_SA_KEY }}"
-          DATABASE_URL: "${{ secrets.DATABASE_URL }}"
-          JWT_SECRET: "SplitBillSecret2026"
-          EOF
-          sed -i 's/^[[:space:]]*//' env.yaml
+          
+          ENCODED_KEY=$(echo '${{ secrets.GCP_SA_KEY }}' | base64 -w 0)
 
           gcloud run deploy splitbill-backend \
             --source . \
             --region=asia-southeast2 \
-            --platform=managed \
             --allow-unauthenticated \
-            --env-vars-file=env.yaml
+            --set-env-vars "GCP_SA_KEY=$ENCODED_KEY,DATABASE_URL=${{ secrets.DATABASE_URL }},JWT_SECRET=SplitBillSecret2026"
