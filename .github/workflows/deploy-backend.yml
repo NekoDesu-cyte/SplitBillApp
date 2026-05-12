@@ -34,5 +34,4 @@ jobs:
             --source . \
             --region=asia-southeast2 \
             --allow-unauthenticated \
-            --set-env-vars DATABASE_URL="${{ secrets.DATABASE_URL }}"
-            --set-env-vars GCP_SA_KEY="${{ secrets.GCP_SA_KEY }}"
+            --set-env-vars DATABASE_URL="${{ secrets.DATABASE_URL }}",GCP_SA_KEY='${{ secrets.GCP_SA_KEY }}',JWT_SECRET="SplitBillSecret2026"
