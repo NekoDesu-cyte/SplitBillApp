@@ -1,23 +1,23 @@
-# Gunakan image Node.js versi 20 berbasis Alpine Linux yang ringan
 FROM node:20-alpine
 
-# Buat direktori kerja di dalam kontainer
 WORKDIR /usr/src/app
 
-# Salin file konfigurasi npm
+# Salin package files
 COPY package*.json ./
 
-# Install dependensi khusus production (menghindari devDependencies jika ada)
-RUN npm ci --only=production
+# Gunakan npm install jika npm ci bermasalah dengan package-lock yang tidak update
+RUN npm install --only=production
 
-# Salin seluruh file proyek backend, termasuk kredensial bagibayar-9f5639182963.json
+# Salin semua file
 COPY . .
 
-# Buat folder penampungan sementara untuk multer agar terhindar dari error direktori tidak ditemukan
-RUN mkdir -p uploads && mkdir -p /tmp/uploads
+# Pastikan folder tmp tersedia untuk multer
+RUN mkdir -p /tmp/uploads
 
-# Ekspos port standar Cloud Run
+# Pastikan tidak ada hardcode ke file JSON di langkah RUN manapun
+# Jika ada langkah build (seperti tsc), pastikan tidak butuh file JSON tersebut
+
 EXPOSE 8080
 
-# Jalankan server
-CMD [ "npm", "start" ]
+# Jalankan langsung dengan node untuk melihat error lebih jelas jika start script bermasalah
+CMD [ "node", "server.js" ]

@@ -17,25 +17,9 @@ const app = express();
 const httpServer = createServer(app);
 
 
-let visionClient;
-if (process.env.GCP_SA_KEY) {
-  try {
-    let keyData = process.env.GCP_SA_KEY.trim();
-    
-    // Auto-detect: Jika bukan JSON mentah (diawali {), berarti Base64
-    if (!keyData.startsWith('{')) {
-      keyData = Buffer.from(keyData, 'base64').toString('utf-8');
-    }
-
-    visionClient = new vision.ImageAnnotatorClient({
-      credentials: JSON.parse(keyData)
-    });
-    console.log("✅ Vision Client initialized");
-  } catch (e) {
-    console.error("❌ Gagal inisialisasi Vision Client:", e.message);
-    visionClient = null; 
-  }
-}
+const visionClient = new vision.ImageAnnotatorClient({
+  credentials: JSON.parse(process.env.GCP_SA_KEY) 
+});
 
 function cleanPrice(priceStr) {
   const digits = priceStr.replace(/\D/g, "");
