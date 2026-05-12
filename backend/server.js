@@ -17,6 +17,7 @@ const app = express();
 const httpServer = createServer(app);
 
 
+let visionClient;
 if (process.env.GCP_SA_KEY) {
   try {
     const decodedKey = Buffer.from(process.env.GCP_SA_KEY, 'base64').toString();
@@ -152,7 +153,7 @@ app.use(express.json());
 const sql = neon(process.env.DATABASE_URL);
 
 // Konfigurasi folder penampung foto sementara
-const upload = multer({ dest: "uploads/" });
+const upload = multer({ dest: "/tmp/uploads/" });
 
 // --- AUTH API ---
 app.post("/api/auth/register", async (req, res) => {
