@@ -16,7 +16,7 @@ const app = express();
 const httpServer = createServer(app);
 
 const visionClient = new vision.ImageAnnotatorClient({
-  keyFilename: "bagibayar-9f5639182963.json"
+  credentials: JSON.parse(process.env.GCP_SA_KEY) 
 });
 
 function cleanPrice(priceStr) {
