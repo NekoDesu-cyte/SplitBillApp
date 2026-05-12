@@ -64,8 +64,17 @@ jobs:
         run: |
           python3 - <<'PYEOF'
           import yaml, os
+
+          def strip_quotes(s):
+              """Remove surrounding single or double quotes added by .env format."""
+              s = s.strip()
+              if (s.startswith('"') and s.endswith('"')) or \
+                 (s.startswith("'") and s.endswith("'")):
+                  s = s[1:-1]
+              return s
+
           data = {
-              'DATABASE_URL': os.environ['DATABASE_URL'],
+              'DATABASE_URL': strip_quotes(os.environ['DATABASE_URL']),
               'GCP_SA_KEY':   os.environ['GCP_SA_KEY'],
               'JWT_SECRET':   'SplitBillSecret2026',
           }
