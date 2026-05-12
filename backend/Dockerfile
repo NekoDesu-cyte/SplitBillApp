@@ -14,7 +14,7 @@ RUN npm ci --only=production
 COPY . .
 
 # Buat folder penampungan sementara untuk multer agar terhindar dari error direktori tidak ditemukan
-RUN mkdir -p uploads
+RUN mkdir -p uploads && mkdir -p /tmp/uploads
 
 # Ekspos port standar Cloud Run
 EXPOSE 8080
