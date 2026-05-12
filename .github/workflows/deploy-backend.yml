@@ -4,11 +4,9 @@ on:
   push:
     branches:
       - main
-    # Workflow ini akan terpicu jika ada perubahan di folder backend atau pada file workflow ini sendiri
     paths:
       - 'backend/**'
       - '.github/workflows/deploy-backend.yml'
-      
 
 jobs:
   deploy:
@@ -27,14 +25,37 @@ jobs:
       - name: Set up Google Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
+      - name: Generate env.yaml safely
+        # Pass secrets via env: so GitHub Actions masks them properly and
+        # no shell-quoting issues arise from special characters in values.
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+        run: |
+          python3 - <<'PYEOF'
+          import yaml, os
+          data = {
+              'DATABASE_URL': os.environ['DATABASE_URL'],
+              'GCP_SA_KEY':   os.environ['GCP_SA_KEY'],
+              'JWT_SECRET':   'SplitBillSecret2026',
+          }
+          with open('backend/env.yaml', 'w') as f:
+              yaml.dump(data, f, default_flow_style=False, allow_unicode=True)
+          print("env.yaml generated successfully")
+          PYEOF
+
       - name: Deploy Backend Service to Cloud Run
         run: |
-          cd backend
-          
-          ENCODED_KEY=$(echo '${{ secrets.GCP_SA_KEY }}' | base64 -w 0)
-
           gcloud run deploy splitbill-backend \
-            --source . \
+            --source ./backend \
             --region=asia-southeast2 \
+            --platform=managed \
             --allow-unauthenticated \
-            --set-env-vars "GCP_SA_KEY=$ENCODED_KEY,DATABASE_URL=${{ secrets.DATABASE_URL }},JWT_SECRET=SplitBillSecret2026"
+            --env-vars-file=backend/env.yaml
+
+      - name: Grant public access (fix IAM warning)
+        run: |
+          gcloud beta run services add-iam-policy-binding splitbill-backend \
+            --region=asia-southeast2 \
+            --member=allUsers \
+            --role=roles/run.invoker

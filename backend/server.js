@@ -157,7 +157,15 @@ const io = new Server(httpServer, { cors: { origin: "*" } });
 
 app.use(cors());
 app.use(express.json());
-const sql = neon(process.env.DATABASE_URL);
+
+// Guard: neon() throws if DATABASE_URL is undefined, crashing the container.
+// Log a clear error and let the server still bind so Cloud Run health-check passes.
+if (!process.env.DATABASE_URL) {
+  console.error("❌ FATAL: DATABASE_URL environment variable is not set!");
+}
+const sql = process.env.DATABASE_URL
+  ? neon(process.env.DATABASE_URL)
+  : (() => { throw new Error("DATABASE_URL not configured"); });
 
 // Konfigurasi folder penampung foto sementara
 const upload = multer({ dest: "/tmp/uploads/" });
