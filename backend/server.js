@@ -7,6 +7,7 @@ import "dotenv/config";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
+
 import multer from "multer";
 import vision from "@google-cloud/vision";
 import fs from "fs";
@@ -15,9 +16,19 @@ const JWT_SECRET = "SplitBillSecret2026";
 const app = express();
 const httpServer = createServer(app);
 
-const visionClient = new vision.ImageAnnotatorClient({
-  credentials: JSON.parse(process.env.GCP_SA_KEY) 
-});
+let visionClient;
+try {
+  if (process.env.GCP_SA_KEY) {
+    visionClient = new vision.ImageAnnotatorClient({
+      credentials: JSON.parse(process.env.GCP_SA_KEY)
+    });
+    console.log("✅ Vision Client initialized");
+  } else {
+    console.error("❌ GCP_SA_KEY is missing in environment variables");
+  }
+} catch (error) {
+  console.error("❌ Failed to parse GCP_SA_KEY:", error.message);
+}
 
 function cleanPrice(priceStr) {
   const digits = priceStr.replace(/\D/g, "");
@@ -451,5 +462,7 @@ io.on("connection", (socket) => {
     console.log("❌ User disconnected:", socket.id);
   });
 });
-const PORT = process.env.PORT || 5000;
-httpServer.listen(PORT, () => console.log(`🚀 Server Ready on port ${PORT}`));
+const PORT = process.env.PORT || 8080;
+httpServer.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Server Ready on port ${PORT}`);
+});
