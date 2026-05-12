@@ -98,7 +98,7 @@ const AuthModal = ({
             Login Dulu, Yuk!
           </h3>
           <p className="text-slate-500 text-xs mb-8 leading-relaxed px-2">
-            Kamu perlu masuk ke akunmu untuk bisa membuat ruangan split bill dan
+            Kamu perlu masuk ke akunmu untuk bisa membuat ruangan Bagi Bayar dan
             memantau riwayatnya.
           </p>
           <div className="flex flex-col gap-3">
@@ -309,7 +309,7 @@ export default function App() {
                 <Receipt className="text-white w-4 h-4" />
               </div>
               <span className="font-display font-extrabold text-lg tracking-tight text-[#4f46e5]">
-                BagiBayar
+                Bagi Bayar
               </span>
             </div>
 
