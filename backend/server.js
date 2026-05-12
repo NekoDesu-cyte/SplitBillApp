@@ -12,7 +12,7 @@ import multer from "multer";
 import vision from "@google-cloud/vision";
 import fs from "fs";
 
-const JWT_SECRET = "SplitBillSecret2026";
+const JWT_SECRET = process.env.JWT_SECRET || "SplitBillSecret2026";
 const app = express();
 const httpServer = createServer(app);
 
@@ -20,13 +20,20 @@ const httpServer = createServer(app);
 let visionClient;
 if (process.env.GCP_SA_KEY) {
   try {
-    const decodedKey = Buffer.from(process.env.GCP_SA_KEY, 'base64').toString();
+    let keyData = process.env.GCP_SA_KEY.trim();
+    
+    // Auto-detect: Jika bukan JSON mentah (diawali {), berarti Base64
+    if (!keyData.startsWith('{')) {
+      keyData = Buffer.from(keyData, 'base64').toString('utf-8');
+    }
+
     visionClient = new vision.ImageAnnotatorClient({
-      credentials: JSON.parse(decodedKey)
+      credentials: JSON.parse(keyData)
     });
     console.log("✅ Vision Client initialized");
   } catch (e) {
-    console.error("❌ Gagal parse GCP_SA_KEY:", e.message);
+    console.error("❌ Gagal inisialisasi Vision Client:", e.message);
+    visionClient = null; 
   }
 }
 
@@ -462,7 +469,10 @@ io.on("connection", (socket) => {
     console.log("❌ User disconnected:", socket.id);
   });
 });
-const PORT = process.env.PORT || 5000;
+
+const PORT = process.env.PORT || 8080; 
 httpServer.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server Ready on port ${PORT}`);
+}).on('error', (err) => {
+  console.error("❌ Server gagal jalan:", err);
 });
