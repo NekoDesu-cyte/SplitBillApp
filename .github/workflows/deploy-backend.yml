@@ -13,6 +13,12 @@ jobs:
     name: Build & Deploy to Cloud Run
     runs-on: ubuntu-latest
 
+    env:
+      PROJECT_ID: bagibayar
+      REGION: asia-southeast2
+      REPO: splitbill-repo
+      IMAGE: splitbill-backend
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -25,9 +31,33 @@ jobs:
       - name: Set up Google Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Ensure Artifact Registry repo exists
+        run: |
+          gcloud artifacts repositories describe ${{ env.REPO }} \
+            --location=${{ env.REGION }} \
+            --project=${{ env.PROJECT_ID }} \
+          || gcloud artifacts repositories create ${{ env.REPO }} \
+            --repository-format=docker \
+            --location=${{ env.REGION }} \
+            --project=${{ env.PROJECT_ID }} \
+            --description="SplitBill backend images"
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:${{ github.sha }} \
+            --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:latest \
+            ./backend
+
+      - name: Push Docker image to Artifact Registry
+        run: |
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:${{ github.sha }}
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:latest
+
       - name: Generate env.yaml safely
-        # Pass secrets via env: so GitHub Actions masks them properly and
-        # no shell-quoting issues arise from special characters in values.
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
@@ -39,24 +69,24 @@ jobs:
               'GCP_SA_KEY':   os.environ['GCP_SA_KEY'],
               'JWT_SECRET':   'SplitBillSecret2026',
           }
-          with open('backend/env.yaml', 'w') as f:
+          with open('env.yaml', 'w') as f:
               yaml.dump(data, f, default_flow_style=False, allow_unicode=True)
           print("env.yaml generated successfully")
           PYEOF
 
-      - name: Deploy Backend Service to Cloud Run
+      - name: Deploy to Cloud Run
         run: |
           gcloud run deploy splitbill-backend \
-            --source ./backend \
-            --region=asia-southeast2 \
+            --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:${{ github.sha }} \
+            --region=${{ env.REGION }} \
             --platform=managed \
             --allow-unauthenticated \
-            --env-vars-file=backend/env.yaml
+            --env-vars-file=env.yaml
 
       - name: Grant public access (fix IAM warning)
-        continue-on-error: true   # requires roles/run.admin — do once manually if missing
+        continue-on-error: true
         run: |
           gcloud --quiet beta run services add-iam-policy-binding splitbill-backend \
-            --region=asia-southeast2 \
+            --region=${{ env.REGION }} \
             --member=allUsers \
             --role=roles/run.invoker
