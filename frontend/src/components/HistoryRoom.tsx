@@ -28,7 +28,7 @@ export const HistoryRoom: React.FC<HistoryRoomProps> = ({
     const fetchHistory = async () => {
       try {
         const res = await fetch(
-          `http://localhost:5000/api/rooms/user/${userId}/history`,
+          `https://splitbill-backend-804441447131.asia-southeast2.run.app/api/rooms/user/${userId}/history`,
         );
         const data = await res.json();
         setHistory(Array.isArray(data) ? data : []);

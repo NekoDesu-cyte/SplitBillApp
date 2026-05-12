@@ -56,7 +56,7 @@ export const CreateRoom: React.FC<{
     formData.append("receipt", file);
 
     try {
-      const res = await fetch("http://localhost:5000/api/ocr", {
+      const res = await fetch("https://splitbill-backend-804441447131.asia-southeast2.run.app/api/ocr", {
         method: "POST",
         body: formData,
       });
@@ -194,7 +194,7 @@ export const CreateRoom: React.FC<{
     };
 
     try {
-      const res = await fetch("http://localhost:5000/api/rooms", {
+      const res = await fetch("https://splitbill-backend-804441447131.asia-southeast2.run.app/api/rooms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

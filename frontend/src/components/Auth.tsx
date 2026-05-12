@@ -45,7 +45,7 @@ export const Auth: React.FC<AuthProps> = ({ onBack }) => {
     const endpoint = activeTab === "login" ? "login" : "register";
 
     try {
-      const res = await fetch(`http://localhost:5000/api/auth/${endpoint}`, {
+      const res = await fetch(`https://splitbill-backend-804441447131.asia-southeast2.run.app/api/auth/${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

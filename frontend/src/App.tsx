@@ -121,8 +121,8 @@ const AuthModal = ({
 
 export default function App() {
   const [view, setView] = useState<
-    "create-room" | "landing" | "room-detail" | "auth" | "payment" | "history"
-  >((sessionStorage.getItem("app_view") as any) || "create-room");
+    "landing" | "create-room" | "room-detail" | "auth" | "payment" | "history"
+  >((sessionStorage.getItem("app_view") as any) || "landing");
 
   // State baru untuk integrasi backend
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(
@@ -178,7 +178,7 @@ export default function App() {
     setIsJoining(true);
     try {
       const clientId = getClientId();
-      await fetch(`http://localhost:5000/api/rooms/${roomId}/join`, {
+      await fetch(`https://splitbill-backend-804441447131.asia-southeast2.run.app/api/rooms/${roomId}/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clientId, participantName: name })
@@ -202,7 +202,7 @@ export default function App() {
 
     setIsJoining(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/rooms/code/${roomCode}`);
+      const res = await fetch(`https://splitbill-backend-804441447131.asia-southeast2.run.app/api/rooms/code/${roomCode}`);
       if (!res.ok) throw new Error("Kode tidak ditemukan");
       const data = await res.json();
       

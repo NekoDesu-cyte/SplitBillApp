@@ -457,5 +457,5 @@ io.on("connection", (socket) => {
     console.log("❌ User disconnected:", socket.id);
   });
 });
-
-httpServer.listen(5000, () => console.log("🚀 Server Ready"));
+const PORT = process.env.PORT || 5000;
+httpServer.listen(PORT, () => console.log(`🚀 Server Ready on port ${PORT}`));

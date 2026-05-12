@@ -138,7 +138,7 @@ export const RoomDetail: React.FC<{
 
   const fetchRoomData = async () => {
     try {
-      const res = await fetch(`http://localhost:5000/api/rooms/${roomId}`);
+      const res = await fetch(`https://splitbill-backend-804441447131.asia-southeast2.run.app/api/rooms/${roomId}`);
       if (!res.ok) throw new Error(); // Tambahkan ini agar masuk ke catch jika 404
 
       const data = await res.json();
@@ -279,7 +279,7 @@ export const RoomDetail: React.FC<{
         // Ambil claims paling up-to-date di momen fetch ini berjalan
         const latestItem = optimisticItemsRef.current.find(it => it.id === itemId);
         if (latestItem) {
-          await fetch(`http://localhost:5000/api/rooms/${roomId}/items/${itemId}`, {
+          await fetch(`https://splitbill-backend-804441447131.asia-southeast2.run.app/api/rooms/${roomId}/items/${itemId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ claims: latestItem.claims }),
@@ -324,7 +324,7 @@ export const RoomDetail: React.FC<{
     setShowConfirmClose(false); // Tutup modal saat tombol 'Ya' ditekan
     try {
       const res = await fetch(
-        `http://localhost:5000/api/rooms/${roomId}/close`,
+        `https://splitbill-backend-804441447131.asia-southeast2.run.app/api/rooms/${roomId}/close`,
         {
           method: "PATCH",
         },

@@ -80,7 +80,7 @@ export const Payment: React.FC<{ roomId: string; onBack: () => void }> = ({
         if (savedUser) {
           myClientId = String(JSON.parse(savedUser).id);
         }
-        const res = await fetch(`http://localhost:5000/api/rooms/${roomId}`);
+        const res = await fetch(`https://splitbill-backend-804441447131.asia-southeast2.run.app/api/rooms/${roomId}`);
 
         if (!res.ok) throw new Error("Gagal mengambil data");
         const data = await res.json();
@@ -142,7 +142,7 @@ export const Payment: React.FC<{ roomId: string; onBack: () => void }> = ({
         participantName = user.name;
       }
 
-      await fetch(`http://localhost:5000/api/rooms/${roomId}/pay`, {
+      await fetch(`https://splitbill-backend-804441447131.asia-southeast2.run.app/api/rooms/${roomId}/pay`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
