@@ -19,11 +19,54 @@ import {
   LogIn,
   LogOut,
   Clock,
+  User as UserIcon,
 } from "lucide-react";
 import { CreateRoom } from "./components/CreateRoom";
 import { RoomDetail } from "./components/RoomDetail";
 import { Auth } from "./components/Auth";
 import { HistoryRoom } from "./components/HistoryRoom";
+
+// --- KOMPONEN MODAL KENALAN GUEST ---
+const GuestNameModal = ({
+  isOpen,
+  onSave,
+}: {
+  isOpen: boolean;
+  onSave: (name: string) => void;
+}) => {
+  const [name, setName] = useState("");
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"></div>
+      <div className="relative bg-white w-full max-w-[360px] rounded-[2rem] p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
+        <div className="text-center mb-5">
+          <div className="w-14 h-14 bg-indigo-50 text-[#4f46e5] rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <UserIcon className="w-7 h-7" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-900 mb-1">
+            Kenalan Dulu!
+          </h3>
+          <p className="text-slate-500 text-[11px] leading-relaxed px-2">
+            Masukkan namamu agar teman-teman tahu siapa yang bergabung di ruangan ini.
+          </p>
+        </div>
+        <input
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Nama kamu..."
+          className="w-full px-5 py-3.5 rounded-xl bg-[#fafafa] border border-slate-200 focus:border-[#4f46e5] focus:ring-1 focus:ring-[#4f46e5] outline-none font-bold text-center mb-4 transition-all text-sm"
+        />
+        <button
+          onClick={() => name.trim() && onSave(name)}
+          className="w-full bg-[#4f46e5] text-white py-3.5 rounded-xl font-bold shadow-md hover:bg-indigo-700 active:scale-[0.98] transition-all text-sm">
+          Masuk Ruangan
+        </button>
+      </div>
+    </div>
+  );
+};
 
 // --- KOMPONEN MODAL POP-UP (LOGIN) ---
 const AuthModal = ({
@@ -78,8 +121,8 @@ const AuthModal = ({
 
 export default function App() {
   const [view, setView] = useState<
-    "landing" | "create-room" | "room-detail" | "auth" | "payment" | "history"
-  >((sessionStorage.getItem("app_view") as any) || "landing");
+    "create-room" | "landing" | "room-detail" | "auth" | "payment" | "history"
+  >((sessionStorage.getItem("app_view") as any) || "create-room");
 
   // State baru untuk integrasi backend
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(
@@ -89,6 +132,8 @@ export default function App() {
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState<string | null>(null); // State baru untuk error
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showGuestNameModal, setShowGuestNameModal] = useState(false);
+  const [pendingRoomId, setPendingRoomId] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
 
   // Load user data dari localStorage
@@ -118,10 +163,38 @@ export default function App() {
     else setShowAuthModal(true);
   };
 
-  const handleJoin = async () => {
-    // Reset error setiap kali tombol ditekan
-    setError(null);
+  const getClientId = () => {
+    const savedUser = localStorage.getItem("user");
+    if (savedUser) return String(JSON.parse(savedUser).id);
+    let guestId = localStorage.getItem("splitbill_client_id");
+    if (!guestId) {
+      guestId = "guest-" + Math.random().toString(36).substring(2, 9);
+      localStorage.setItem("splitbill_client_id", guestId);
+    }
+    return guestId;
+  };
 
+  const handleJoinRequest = async (roomId: string, name: string) => {
+    setIsJoining(true);
+    try {
+      const clientId = getClientId();
+      await fetch(`http://localhost:5000/api/rooms/${roomId}/join`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId, participantName: name })
+      });
+      setSelectedRoomId(roomId);
+      setView("room-detail");
+    } catch (e) {
+      setError("Gagal bergabung ke ruangan.");
+    } finally {
+      setIsJoining(false);
+      setShowGuestNameModal(false);
+    }
+  };
+
+  const handleJoin = async () => {
+    setError(null);
     if (!roomCode || roomCode.length < 4) {
       setError("Masukkan 4 digit kode room!");
       return;
@@ -129,16 +202,25 @@ export default function App() {
 
     setIsJoining(true);
     try {
-      const res = await fetch(
-        `http://localhost:5000/api/rooms/code/${roomCode}`,
-      );
+      const res = await fetch(`http://localhost:5000/api/rooms/code/${roomCode}`);
       if (!res.ok) throw new Error("Kode tidak ditemukan");
       const data = await res.json();
-      setSelectedRoomId(data.id);
-      setView("room-detail");
+      
+      const roomId = data.id;
+      if (user) {
+        await handleJoinRequest(roomId, user.name);
+      } else {
+        const existingName = localStorage.getItem(`guest_name_${roomId}`);
+        if (existingName) {
+          await handleJoinRequest(roomId, existingName);
+        } else {
+          setPendingRoomId(roomId);
+          setShowGuestNameModal(true);
+          setIsJoining(false);
+        }
+      }
     } catch (error) {
-      setError("Kode salah atau room sudah dihapus."); // Set pesan error UI
-    } finally {
+      setError("Kode salah atau room sudah dihapus.");
       setIsJoining(false);
     }
   };
@@ -201,6 +283,15 @@ export default function App() {
     <div className="min-h-screen bg-slate-100 flex justify-center font-sans text-slate-800 overflow-x-hidden">
       {/* Kontainer Mobile (Layar HP) - max-w-[480px] */}
       <div className="w-full max-w-[480px] bg-white min-h-screen shadow-2xl relative flex flex-col pb-10">
+        <GuestNameModal 
+          isOpen={showGuestNameModal}
+          onSave={(name) => {
+            if (pendingRoomId) {
+              localStorage.setItem(`guest_name_${pendingRoomId}`, name);
+              handleJoinRequest(pendingRoomId, name);
+            }
+          }}
+        />
         <AuthModal
           isOpen={showAuthModal}
           onClose={() => setShowAuthModal(false)}

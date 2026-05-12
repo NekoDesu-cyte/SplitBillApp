@@ -11,50 +11,9 @@ import {
   User as UserIcon,
   ArrowLeft,
   AlertCircle,
+  Clock,
 } from "lucide-react";
 import { socket } from "../socket";
-
-// --- MODAL KENALAN GUEST ---
-const GuestNameModal = ({
-  isOpen,
-  onSave,
-}: {
-  isOpen: boolean;
-  onSave: (name: string) => void;
-}) => {
-  const [name, setName] = useState("");
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"></div>
-      <div className="relative bg-white w-full max-w-[360px] rounded-[2rem] p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
-        <div className="text-center mb-5">
-          <div className="w-14 h-14 bg-indigo-50 text-[#4f46e5] rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <UserIcon className="w-7 h-7" />
-          </div>
-          <h3 className="text-lg font-bold text-slate-900 mb-1">
-            Kenalan Dulu!
-          </h3>
-          <p className="text-slate-500 text-[11px] leading-relaxed px-2">
-            Masukkan namamu agar teman-teman tahu siapa yang memesan menu ini.
-          </p>
-        </div>
-        <input
-          autoFocus
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Nama kamu..."
-          className="w-full px-5 py-3.5 rounded-xl bg-[#fafafa] border border-slate-200 focus:border-[#4f46e5] focus:ring-1 focus:ring-[#4f46e5] outline-none font-bold text-center mb-4 transition-all text-sm"
-        />
-        <button
-          onClick={() => name.trim() && onSave(name)}
-          className="w-full bg-[#4f46e5] text-white py-3.5 rounded-xl font-bold shadow-md hover:bg-indigo-700 active:scale-[0.98] transition-all text-sm">
-          Lanjut ke Pembayaran
-        </button>
-      </div>
-    </div>
-  );
-};
 
 // --- MODAL KONFIRMASI TUTUP ROOM ---
 const ConfirmCloseModal = ({
@@ -117,6 +76,7 @@ export const RoomDetail: React.FC<{
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showConfirmClose, setShowConfirmClose] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
 
   const pendingRequests = useRef(0);
   const requestQueue = useRef(Promise.resolve());
@@ -149,7 +109,6 @@ export const RoomDetail: React.FC<{
     sessionStorage.setItem(`notif_${roomId}`, JSON.stringify(notifHistory));
   }, [notifHistory, roomId]);
 
-  const [showNameModal, setShowNameModal] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
 
   const handleCopyCode = () => {
@@ -197,6 +156,7 @@ export const RoomDetail: React.FC<{
       const uniqueParticipants = Array.from(
         new Map(rawParticipants.map((p: any) => [p.id, p])).values(),
       );
+      optimisticItemsRef.current = data.items || [];
       setParticipants(uniqueParticipants);
     } catch (e) {
       // GANTI ALERT JADI UI SERASI
@@ -209,7 +169,7 @@ export const RoomDetail: React.FC<{
   useEffect(() => {
     if (roomId) {
       fetchRoomData();
-      socket.emit("joinRoom", roomId);
+      socket.emit("joinRoom", { roomId, clientId: myClientId });
 
       socket.on("updateData", () => {
         // Abaikan socket event jika kita masih ada request yang tertunda
@@ -219,6 +179,10 @@ export const RoomDetail: React.FC<{
         }
 
         fetchRoomData();
+      });
+
+      socket.on("onlineUsers", (users: string[]) => {
+        setOnlineUsers(users);
       });
 
       socket.on("paymentNotification", (data: { participantName: string }) => {
@@ -237,12 +201,13 @@ export const RoomDetail: React.FC<{
       });
 
       return () => {
-        socket.emit("leaveRoom", roomId);
+        socket.emit("leaveRoom", { roomId, clientId: myClientId });
         socket.off("updateData");
+        socket.off("onlineUsers");
         socket.off("paymentNotification");
       };
     }
-  }, [roomId]);
+  }, [roomId, myClientId]);
 
   const amIPaid =
     participants.find((p) => p.id === myClientId)?.is_paid || false;
@@ -334,11 +299,6 @@ export const RoomDetail: React.FC<{
   };
 
   const handlePayClick = () => {
-    myIdentity.isGuest ? setShowNameModal(true) : onPay();
-  };
-  const handleSaveGuestName = (name: string) => {
-    localStorage.setItem(`guest_name_${roomId}`, name);
-    setShowNameModal(false);
     onPay();
   };
 
@@ -388,7 +348,6 @@ export const RoomDetail: React.FC<{
     <div className="min-h-screen bg-slate-100 flex justify-center font-sans text-slate-800 overflow-x-hidden">
       {/* Kontainer Mobile */}
       <div className="w-full max-w-[480px] bg-[#f8f9fa] min-h-screen shadow-2xl relative flex flex-col">
-        <GuestNameModal isOpen={showNameModal} onSave={handleSaveGuestName} />
 
         {/* TAMBAHKAN MODAL INI DI SINI */}
         <ConfirmCloseModal
@@ -606,6 +565,9 @@ export const RoomDetail: React.FC<{
                           <div className="absolute -bottom-1 -right-1 bg-green-500 text-white w-5 h-5 rounded-full flex items-center justify-center border-2 border-white">
                             <CheckCircle2 className="w-3 h-3" />
                           </div>
+                        )}
+                        {!p.is_paid && onlineUsers.includes(String(p.id)) && (
+                          <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full"></div>
                         )}
                       </div>
                       <div className="text-[10px] font-bold text-slate-700 truncate w-full text-center">

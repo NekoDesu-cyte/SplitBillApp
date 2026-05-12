@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   ArrowLeft,
   Clock,
@@ -27,35 +27,90 @@ export const Payment: React.FC<{ roomId: string; onBack: () => void }> = ({
 
   // State untuk Backend & Fungsionalitas Pembayaran
   const [totalTagihan, setTotalTagihan] = useState(0);
+  const [myItems, setMyItems] = useState<any[]>([]);
+  const [subtotal, setSubtotal] = useState(0);
+  const [tax, setTax] = useState(0);
+  const [service, setService] = useState(0);
+  const [paymentAccount, setPaymentAccount] = useState<string>("");
   const [isConfirming, setIsConfirming] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [timeLeft, setTimeLeft] = useState<string>("--:--:--");
+  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
+
+  // Timer Countdown Effect
+  useEffect(() => {
+    if (remainingSeconds === null) return;
+    
+    let currentSeconds = remainingSeconds;
+    
+    // Set initial display immediately
+    const h = Math.floor(currentSeconds / 3600);
+    const m = Math.floor((currentSeconds % 3600) / 60);
+    const s = Math.floor(currentSeconds % 60);
+    setTimeLeft(
+      `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+    );
+
+    const interval = setInterval(() => {
+      currentSeconds = Math.max(0, currentSeconds - 1);
+      
+      const h = Math.floor(currentSeconds / 3600);
+      const m = Math.floor((currentSeconds % 3600) / 60);
+      const s = Math.floor(currentSeconds % 60);
+      
+      setTimeLeft(
+        `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+      );
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [remainingSeconds]);
 
   // Logic untuk mengambil total tagihan berdasarkan item yang di-claim user
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = 0;
+    }
+
     const fetchPaymentData = async () => {
       try {
-        const myClientId =
-          localStorage.getItem("splitbill_client_id") || "guest";
+        let myClientId = localStorage.getItem("splitbill_client_id") || "guest";
+        const savedUser = localStorage.getItem("user");
+        if (savedUser) {
+          myClientId = String(JSON.parse(savedUser).id);
+        }
         const res = await fetch(`http://localhost:5000/api/rooms/${roomId}`);
 
         if (!res.ok) throw new Error("Gagal mengambil data");
         const data = await res.json();
 
-        const myItems = (data.items || [])
+        setPaymentAccount(data.payment_account || data.paymentAccount || "");
+        if (data.remainingSeconds !== undefined) {
+          setRemainingSeconds(data.remainingSeconds);
+        }
+
+        const items = (data.items || [])
           .map((it: any) => ({
             ...it,
             myQty: (it.claims || {})[myClientId] || 0,
           }))
           .filter((it: any) => it.myQty > 0);
+          
+        setMyItems(items);
 
-        const sub = myItems.reduce(
+        const sub = items.reduce(
           (acc: number, it: any) => acc + it.price * it.myQty,
           0,
         );
+        setSubtotal(sub);
 
         // Memastikan penamaan properti persentase pajak dan servis sesuai dari backend
         const taxPercent = data.taxPercent || data.tax_percent || 0;
         const servicePercent = data.servicePercent || data.service_percent || 0;
+        
+        setTax((sub * taxPercent) / 100);
+        setService((sub * servicePercent) / 100);
 
         setTotalTagihan(
           sub + (sub * taxPercent) / 100 + (sub * servicePercent) / 100,
@@ -128,22 +183,61 @@ export const Payment: React.FC<{ roomId: string; onBack: () => void }> = ({
             <div className="flex items-center gap-1.5 bg-red-50 text-red-500 px-2.5 py-1 rounded-full shrink-0 border border-red-100">
               <Clock className="w-3.5 h-3.5" />
               <span className="text-[11px] font-bold tracking-wide">
-                23:59:45
+                {timeLeft}
               </span>
             </div>
           </div>
         </nav>
 
         {/* Konten Utama */}
-        <div className="px-4 py-6 overflow-y-auto flex-1">
+        <div ref={scrollRef} className="px-4 py-6 overflow-y-auto flex-1 scroll-smooth">
           <div className="flex flex-col gap-6">
-            {/* --- KARTU TOTAL TAGIHAN (DITAMBAHKAN KEMBALI) --- */}
-            <div className="bg-white rounded-[1.5rem] border border-slate-200 p-6 shadow-sm text-center">
-              <h3 className="text-[11px] font-bold text-slate-400 mb-1.5 tracking-widest uppercase">
-                TOTAL TAGIHAN KAMU
+            {/* --- RINCIAN PESANAN DAN KARTU TOTAL TAGIHAN --- */}
+            <div className="bg-white rounded-[1.5rem] border border-slate-200 p-6 shadow-sm">
+              <h3 className="text-[13px] font-bold text-slate-800 mb-4 tracking-widest uppercase text-center border-b border-slate-100 pb-3">
+                Rincian Tagihan Kamu
               </h3>
-              <div className="text-3xl font-black text-[#4f46e5]">
-                Rp {totalTagihan.toLocaleString("id-ID")}
+              
+              <div className="space-y-3 mb-4">
+                {myItems.map((item, idx) => (
+                  <div key={idx} className="flex justify-between items-center text-sm">
+                    <div>
+                      <div className="font-bold text-slate-700">{item.name}</div>
+                      <div className="text-[11px] text-slate-500">{item.myQty}x Rp {item.price.toLocaleString("id-ID")}</div>
+                    </div>
+                    <div className="font-bold text-slate-800">
+                      Rp {(item.price * item.myQty).toLocaleString("id-ID")}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-2 pt-3 border-t border-dashed border-slate-200 mb-4">
+                <div className="flex justify-between text-[11px] text-slate-500">
+                  <span>Subtotal</span>
+                  <span>Rp {subtotal.toLocaleString("id-ID")}</span>
+                </div>
+                {tax > 0 && (
+                  <div className="flex justify-between text-[11px] text-slate-500">
+                    <span>Pajak</span>
+                    <span>Rp {tax.toLocaleString("id-ID")}</span>
+                  </div>
+                )}
+                {service > 0 && (
+                  <div className="flex justify-between text-[11px] text-slate-500">
+                    <span>Layanan</span>
+                    <span>Rp {service.toLocaleString("id-ID")}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="text-center pt-4 border-t border-slate-100">
+                <h3 className="text-[11px] font-bold text-slate-400 mb-1.5 tracking-widest uppercase">
+                  TOTAL TAGIHAN KAMU
+                </h3>
+                <div className="text-3xl font-black text-[#4f46e5]">
+                  Rp {totalTagihan.toLocaleString("id-ID")}
+                </div>
               </div>
             </div>
 
@@ -153,18 +247,18 @@ export const Payment: React.FC<{ roomId: string; onBack: () => void }> = ({
                 Metode Pembayaran
               </h2>
 
-              {/* Selected Method (QRIS) */}
+              {/* Selected Method (E-Wallet) */}
               <div className="border border-[#4f46e5] bg-indigo-50/30 rounded-xl p-3 flex items-center justify-between mb-5 cursor-pointer">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 bg-indigo-100 rounded-lg flex items-center justify-center text-[#4f46e5]">
-                    <QrCode className="w-4 h-4" />
+                    <Wallet className="w-4 h-4" />
                   </div>
                   <div>
                     <div className="text-[13px] font-bold text-slate-800">
-                      QRIS
+                      E-Wallet (Dana/GoPay/OVO)
                     </div>
                     <div className="text-[11px] text-[#4f46e5] font-medium">
-                      Otomatis Terverifikasi
+                      {paymentAccount ? paymentAccount : "Nomor belum diatur oleh Host"}
                     </div>
                   </div>
                 </div>
@@ -174,12 +268,17 @@ export const Payment: React.FC<{ roomId: string; onBack: () => void }> = ({
               {/* Other Methods */}
               <div className="mb-2">
                 <span className="text-[11px] font-bold text-slate-400 tracking-wider">
-                  VIRTUAL ACCOUNT
+                  METODE LAINNYA
                 </span>
               </div>
 
-              <div className="space-y-2.5">
+              <div className="space-y-2.5 opacity-50 pointer-events-none">
                 {[
+                  {
+                    icon: <QrCode className="w-4 h-4" />,
+                    name: "QRIS",
+                    desc: "Otomatis Terverifikasi",
+                  },
                   {
                     icon: <CreditCard className="w-4 h-4" />,
                     name: "Virtual Account",
@@ -190,15 +289,10 @@ export const Payment: React.FC<{ roomId: string; onBack: () => void }> = ({
                     name: "Transfer Bank",
                     desc: "Dicek otomatis",
                   },
-                  {
-                    icon: <Wallet className="w-4 h-4" />,
-                    name: "E-Wallet",
-                    desc: "Konfirmasi instan",
-                  },
                 ].map((method, idx) => (
                   <div
                     key={idx}
-                    className="border border-slate-200 rounded-xl p-3 flex items-center justify-between hover:border-indigo-300 transition-colors cursor-pointer">
+                    className="border border-slate-200 rounded-xl p-3 flex items-center justify-between transition-colors cursor-not-allowed">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 bg-slate-50 rounded-lg flex items-center justify-center text-slate-400">
                         {method.icon}
@@ -212,34 +306,32 @@ export const Payment: React.FC<{ roomId: string; onBack: () => void }> = ({
                         </div>
                       </div>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-slate-400" />
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* 2. QR Code Card */}
+            {/* 2. E-Wallet Payment Card */}
             <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex flex-col items-center">
-              <div className="text-[13px] font-bold text-slate-600 mb-5">
-                Scan QRIS Untuk Membayar
+              <div className="text-[13px] font-bold text-slate-600 mb-5 text-center">
+                Silakan Transfer ke Nomor E-Wallet Berikut
               </div>
 
-              {/* QR Image Placeholder */}
-              <div className="border-2 border-dashed border-indigo-200 p-3 bg-indigo-50/30 rounded-[1.5rem] mb-6">
-                <img
-                  src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=splitbill-payment-123"
-                  alt="QR Code"
-                  className="w-40 h-40 rounded-xl"
-                />
+              {/* Nomor E-Wallet Highlight */}
+              <div className="border-2 border-dashed border-indigo-200 p-5 bg-indigo-50/30 rounded-[1.5rem] mb-6 w-full text-center">
+                <div className="text-2xl font-black text-[#4f46e5] tracking-wider mb-2">
+                  {paymentAccount || "-"}
+                </div>
+                <div className="text-xs text-slate-500 font-medium">
+                  Atas Nama: Host
+                </div>
               </div>
 
-              {/* Tombol QR sejajar di mobile */}
-              <div className="flex items-center gap-3 w-full">
-                <button className="flex-1 py-2.5 rounded-full border border-[#4f46e5] text-[#4f46e5] font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-indigo-50 transition-colors">
-                  <Download className="w-3.5 h-3.5" /> Simpan
-                </button>
-                <button className="flex-1 py-2.5 rounded-full border border-[#4f46e5] text-[#4f46e5] font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-indigo-50 transition-colors">
-                  <Share2 className="w-3.5 h-3.5" /> Bagikan
+              <div className="flex items-center w-full">
+                <button 
+                  onClick={() => navigator.clipboard.writeText(paymentAccount || "")}
+                  className="w-full py-3 rounded-full bg-slate-800 text-white font-bold text-xs flex items-center justify-center gap-2 hover:bg-slate-700 transition-colors">
+                  <CheckCircle2 className="w-4 h-4" /> Salin Nomor
                 </button>
               </div>
             </div>

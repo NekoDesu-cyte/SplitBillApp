@@ -28,10 +28,16 @@ export const CreateRoom: React.FC<{
   const [items, setItems] = useState<Item[]>([]);
   const [tax, setTax] = useState<number>(10);
   const [service, setService] = useState<number>(5);
+  const [eWalletNumber, setEWalletNumber] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const [error, setError] = useState<string | null>(null); // State error
-  const [success, setSuccess] = useState<string | null>(null); // State sukses
+  const [formError, setFormError] = useState<string | null>(null);
+  const [ocrError, setOcrError] = useState<string | null>(null);
+  const [ocrSuccess, setOcrSuccess] = useState<string | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
+  
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const eWalletInputRef = useRef<HTMLInputElement>(null);
 
   const [isExtracting, setIsExtracting] = useState(false);
   const cameraInputRef = useRef<HTMLInputElement>(null); // <-- Ref untuk kamera
@@ -43,8 +49,8 @@ export const CreateRoom: React.FC<{
     if (!file) return;
 
     setIsExtracting(true);
-    setError(null); // Reset feedback
-    setSuccess(null);
+    setOcrError(null);
+    setOcrSuccess(null);
 
     const formData = new FormData();
     formData.append("receipt", file);
@@ -64,12 +70,12 @@ export const CreateRoom: React.FC<{
           quantity: it.quantity,
         }));
         setItems([...items, ...scannedItems]);
-        setSuccess(`Berhasil menemukan ${scannedItems.length} menu!`); // Gunakan UI Success
+        setOcrSuccess(`Berhasil menemukan ${scannedItems.length} menu!`); 
       } else {
-        setError("Tidak ada teks menu yang terdeteksi."); // Gunakan UI Error
+        setOcrError("Tidak ada teks menu yang terdeteksi."); 
       }
     } catch (err) {
-      setError("Gagal mengekstrak struk. Coba lagi nanti.");
+      setOcrError("Gagal mengekstrak struk. Coba lagi nanti.");
     } finally {
       setIsExtracting(false);
       if (cameraInputRef.current) cameraInputRef.current.value = ""; // Reset input kamera
@@ -98,14 +104,14 @@ export const CreateRoom: React.FC<{
     setNewItemName(item.name);
     setNewItemPrice(item.price.toString());
     setNewItemQty(item.quantity);
-    setError(null);
+    setModalError(null);
     setIsModalOpen(true);
   };
 
   // --- FUNGSI SIMPAN ITEM DARI MODAL ---
   const handleAddItem = () => {
     if (!newItemName || !newItemPrice) {
-      setError("Isi nama dan harga item dulu, ya!");
+      setModalError("Isi nama dan harga item dulu, ya!");
       return;
     }
 
@@ -141,17 +147,31 @@ export const CreateRoom: React.FC<{
     setNewItemPrice("");
     setNewItemQty(1);
     setEditingItemId(null);
-    setError(null);
+    setModalError(null);
     setIsModalOpen(false);
   };
 
   const handleCreate = async () => {
     if (!name) {
-      setError("Nama ruangan jangan lupa diisi!");
+      setFormError("Nama ruangan jangan lupa diisi!");
+      if (nameInputRef.current) {
+        nameInputRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+        nameInputRef.current.focus();
+      }
       return;
     }
+
+    if (!eWalletNumber) {
+      setFormError("Nomor E-Wallet wajib diisi untuk mempermudah pembayaran!");
+      if (eWalletInputRef.current) {
+        eWalletInputRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+        eWalletInputRef.current.focus();
+      }
+      return;
+    }
+
     setIsLoading(true);
-    setError(null);
+    setFormError(null);
 
     const user = JSON.parse(localStorage.getItem("user") || "{}");
     const payload = {
@@ -160,7 +180,7 @@ export const CreateRoom: React.FC<{
       code: Math.floor(1000 + Math.random() * 9000).toString(),
       taxPercent: tax,
       servicePercent: service,
-      paymentInfo: { provider: "QRIS", accountNumber: "123456789" },
+      paymentInfo: { provider: "E-Wallet", accountNumber: eWalletNumber || "Belum diisi" },
       items: items.map((it) => ({
         name: it.name,
         price: it.price,
@@ -182,7 +202,7 @@ export const CreateRoom: React.FC<{
       const data = await res.json();
       onCreate(data.id);
     } catch (e) {
-      setError("Gagal membuat ruangan. Periksa koneksi Anda.");
+      setFormError("Gagal membuat ruangan. Periksa koneksi Anda.");
     } finally {
       setIsLoading(false);
     }
@@ -229,8 +249,8 @@ export const CreateRoom: React.FC<{
                 </div>
 
                 {/* Input Harga & Jumlah */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
+                <div className="flex gap-3">
+                  <div className="space-y-1.5 flex-[2]">
                     <label className="text-xs font-semibold text-slate-700">
                       Harga
                     </label>
@@ -239,22 +259,25 @@ export const CreateRoom: React.FC<{
                         Rp
                       </span>
                       <input
+                        type="text"
+                        inputMode="numeric"
                         value={newItemPrice}
-                        onChange={(e) => setNewItemPrice(e.target.value)}
-                        placeholder="45.000"
+                        onChange={(e) => setNewItemPrice(e.target.value.replace(/\D/g, ""))}
+                        placeholder="45000"
                         className="w-full pl-9 pr-3 py-3 rounded-xl bg-[#fafafa] border border-slate-200 focus:border-[#4f46e5] outline-none text-sm font-bold transition-all"
                       />
                     </div>
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 flex-1">
                     <label className="text-xs font-semibold text-slate-700">
                       Jumlah
                     </label>
                     <input
                       type="number"
+                      min="1"
                       value={newItemQty}
                       onChange={(e) => setNewItemQty(Number(e.target.value))}
-                      className="w-full px-4 py-3 rounded-xl bg-[#fafafa] border border-slate-200 focus:border-[#4f46e5] outline-none text-sm font-bold text-center transition-all"
+                      className="w-full px-2 py-3 rounded-xl bg-[#fafafa] border border-slate-200 focus:border-[#4f46e5] outline-none text-sm font-bold text-center transition-all"
                     />
                   </div>
                 </div>
@@ -269,6 +292,12 @@ export const CreateRoom: React.FC<{
                     Anda.
                   </p>
                 </div>
+
+                {modalError && (
+                  <div className="text-red-500 text-xs font-bold text-center mt-2">
+                    {modalError}
+                  </div>
+                )}
 
                 {/* Buttons */}
                 <div className="pt-2 flex flex-col gap-2">
@@ -331,8 +360,12 @@ export const CreateRoom: React.FC<{
                 Nama Ruangan <span className="text-red-500">*</span>
               </label>
               <input
+                ref={nameInputRef}
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  if (formError) setFormError(null);
+                }}
                 type="text"
                 placeholder="Misal: Makan Malam di Sushi Tei"
                 className="w-full px-4 py-3.5 rounded-xl bg-[#fafafa] border border-slate-200 focus:border-[#4f46e5] focus:ring-1 focus:ring-[#4f46e5] outline-none transition-all text-sm font-bold"
@@ -409,6 +442,23 @@ export const CreateRoom: React.FC<{
                   </>
                 )}
               </div>
+              
+              {ocrError && (
+                <div className="mt-3 flex items-center gap-2 text-red-500 bg-red-50 p-3 rounded-xl border border-red-100 animate-in fade-in duration-300">
+                  <AlertCircle size={14} />
+                  <span className="text-[11px] font-bold">{ocrError}</span>
+                </div>
+              )}
+              {ocrSuccess && (
+                <div className="mt-3 flex items-center gap-2 text-emerald-600 bg-emerald-50 p-3 rounded-xl border border-emerald-100 animate-in fade-in duration-300">
+                  <div className="w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center">
+                    <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
+                      <path d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <span className="text-[11px] font-bold">{ocrSuccess}</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -499,6 +549,24 @@ export const CreateRoom: React.FC<{
             </div>
           </div>
 
+          {/* Nomor E-Wallet */}
+          <div className="pt-2">
+            <label className="block text-xs font-bold text-slate-700 mb-2">
+              Nomor E-Wallet (Dana / GoPay / OVO) <span className="text-red-500">*</span>
+            </label>
+            <input
+              ref={eWalletInputRef}
+              type="text"
+              value={eWalletNumber}
+              onChange={(e) => {
+                setEWalletNumber(e.target.value);
+                if (formError) setFormError(null);
+              }}
+              placeholder="Misal: 081234567890"
+              className="w-full px-4 py-3 rounded-xl bg-[#fafafa] border border-slate-200 outline-none focus:border-[#4f46e5] focus:ring-1 focus:ring-[#4f46e5] text-sm font-bold transition-all"
+            />
+          </div>
+
           {/* Ringkasan Biaya */}
           <div className="bg-[#f8f9fa] border border-slate-200 rounded-xl p-4 mt-2">
             <div className="flex justify-between items-center text-xs mb-3">
@@ -532,29 +600,11 @@ export const CreateRoom: React.FC<{
 
           {/* Letakkan ini tepat sebelum tombol "Buat Ruangan Sekarang" */}
           <div className="mt-6">
-            {error && (
+            {formError && (
               <div className="flex items-center gap-2 text-red-500 bg-red-50 p-3.5 rounded-xl animate-in slide-in-from-top-2 duration-300 mb-4 border border-red-100">
                 <AlertCircle size={16} />
                 <span className="text-[11px] font-bold leading-tight">
-                  {error}
-                </span>
-              </div>
-            )}
-
-            {success && (
-              <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 p-3.5 rounded-xl animate-in slide-in-from-top-2 duration-300 mb-4 border border-emerald-100">
-                <div className="w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center">
-                  <svg
-                    className="w-2.5 h-2.5 text-white"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth="4">
-                    <path d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <span className="text-[11px] font-bold leading-tight">
-                  {success}
+                  {formError}
                 </span>
               </div>
             )}
