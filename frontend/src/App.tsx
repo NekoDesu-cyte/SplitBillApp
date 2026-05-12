@@ -309,7 +309,7 @@ export default function App() {
                 <Receipt className="text-white w-4 h-4" />
               </div>
               <span className="font-display font-extrabold text-lg tracking-tight text-[#4f46e5]">
-                BagiBayar
+                Bagi Bayar
               </span>
             </div>
 
