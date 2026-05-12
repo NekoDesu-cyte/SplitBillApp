@@ -54,6 +54,7 @@ jobs:
             --env-vars-file=backend/env.yaml
 
       - name: Grant public access (fix IAM warning)
+        continue-on-error: true   # requires roles/run.admin — do once manually if missing
         run: |
           gcloud --quiet beta run services add-iam-policy-binding splitbill-backend \
             --region=asia-southeast2 \
