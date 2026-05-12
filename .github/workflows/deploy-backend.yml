@@ -63,23 +63,36 @@ jobs:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
         run: |
           python3 - <<'PYEOF'
-          import yaml, os
+          import yaml, os, re
 
-          def strip_quotes(s):
-              """Remove surrounding single or double quotes added by .env format."""
-              s = s.strip()
-              if (s.startswith('"') and s.endswith('"')) or \
-                 (s.startswith("'") and s.endswith("'")):
+          def parse_env_value(raw):
+              """
+              Handle GitHub secrets that may contain the full .env line format:
+                DATABASE_URL="postgresql://..."
+              or just the raw value:
+                postgresql://...
+              """
+              s = raw.strip()
+              # If it looks like KEY=VALUE, extract just the VALUE part
+              m = re.match(r'^[A-Z_][A-Z0-9_]*=(.+)$', s, re.DOTALL)
+              if m:
+                  s = m.group(1).strip()
+              # Strip surrounding single or double quotes
+              if len(s) >= 2 and s[0] == s[-1] and s[0] in ('"', "'"):
                   s = s[1:-1]
               return s
 
           data = {
-              'DATABASE_URL': strip_quotes(os.environ['DATABASE_URL']),
+              'DATABASE_URL': parse_env_value(os.environ['DATABASE_URL']),
               'GCP_SA_KEY':   os.environ['GCP_SA_KEY'],
               'JWT_SECRET':   'SplitBillSecret2026',
           }
+
+          print("DATABASE_URL starts with:", data['DATABASE_URL'][:20])
           with open('env.yaml', 'w') as f:
               yaml.dump(data, f, default_flow_style=False, allow_unicode=True)
+          print("env.yaml generated successfully")
+          PYEOF
           print("env.yaml generated successfully")
           PYEOF
 
