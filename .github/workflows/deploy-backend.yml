@@ -55,7 +55,7 @@ jobs:
 
       - name: Grant public access (fix IAM warning)
         run: |
-          gcloud beta run services add-iam-policy-binding splitbill-backend \
+          gcloud --quiet beta run services add-iam-policy-binding splitbill-backend \
             --region=asia-southeast2 \
             --member=allUsers \
             --role=roles/run.invoker
